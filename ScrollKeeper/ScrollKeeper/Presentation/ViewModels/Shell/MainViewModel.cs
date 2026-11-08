@@ -34,7 +34,8 @@ public sealed partial class MainViewModel : ViewModelBase, IAddonActions
 
     private readonly Dictionary<string, AddonItemViewModel> _items = new(StringComparer.Ordinal);
     private readonly ObservableCollection<AddonItemViewModel> _installed = [];
-    private readonly ObservableCollection<AddonItemViewModel> _browse = [];
+    /// <summary>Replaced as a whole when the catalog loads (see <see cref="ApplyCatalog"/>).</summary>
+    private List<AddonItemViewModel> _browse = [];
     private readonly SemaphoreSlim _refreshLock = new(1, 1);
     private readonly DispatcherTimer _installedSearchTimer;
     private readonly DispatcherTimer _browseSearchTimer;
@@ -74,9 +75,7 @@ public sealed partial class MainViewModel : ViewModelBase, IAddonActions
         installedView.Filter = o => Matches((AddonItemViewModel)o, InstalledSearchText);
         InstalledView = installedView;
 
-        var browseView = (ListCollectionView)CollectionViewSource.GetDefaultView(_browse);
-        browseView.Filter = o => Matches((AddonItemViewModel)o, BrowseSearchText);
-        BrowseView = browseView;
+        _browseView = CreateBrowseView(_browse);
 
         SortOptions =
         [
@@ -84,7 +83,7 @@ public sealed partial class MainViewModel : ViewModelBase, IAddonActions
             new BrowseSortOption(BrowseSort.RecentlyUpdated, "Recently updated"),
             new BrowseSortOption(BrowseSort.Name, "Name")
         ];
-        // Sets the view's CustomSort (OnSelectedSortOptionChanged).
+        // Sets the Browse view's CustomSort (OnSelectedSortOptionChanged).
         SelectedSortOption = SortOptions[0];
 
         _installedSearchTimer = CreateSearchTimer(() => RefreshView(InstalledView));
@@ -95,7 +94,12 @@ public sealed partial class MainViewModel : ViewModelBase, IAddonActions
 
     public ICollectionView InstalledView { get; }
 
-    public ICollectionView BrowseView { get; }
+    /// <summary>
+    /// A new view is created for every catalog load: filling the old one item by item would raise thousands of
+    /// change notifications, and its source must not change while its refresh is deferred.
+    /// </summary>
+    [ObservableProperty]
+    private ListCollectionView _browseView;
 
     public IReadOnlyList<BrowseSortOption> SortOptions { get; }
 
@@ -283,13 +287,8 @@ public sealed partial class MainViewModel : ViewModelBase, IAddonActions
         foreach (var item in _items.Values.Where(i => i.Catalog is not null && !ids.Contains(i.Key)))
             item.SetCatalog(null, null);
 
-        // One reset instead of thousands of Add notifications.
-        using (BrowseView.DeferRefresh())
-        {
-            _browse.Clear();
-            foreach (var item in browse)
-                _browse.Add(item);
-        }
+        _browse = browse;
+        BrowseView = CreateBrowseView(browse);
 
         OnPropertyChanged(nameof(BrowseHeader));
     }
@@ -369,8 +368,22 @@ public sealed partial class MainViewModel : ViewModelBase, IAddonActions
 
     partial void OnSelectedSortOptionChanged(BrowseSortOption value)
     {
-        if (BrowseView is ListCollectionView view && value is not null)
-            view.CustomSort = value.Comparer;
+        if (value is not null)
+            BrowseView.CustomSort = value.Comparer;
+    }
+
+    /// <summary>Filtered by the Browse search box and sorted by the selected option.</summary>
+    private ListCollectionView CreateBrowseView(List<AddonItemViewModel> items)
+    {
+        var view = new ListCollectionView(items)
+        {
+            Filter = o => Matches((AddonItemViewModel)o, BrowseSearchText)
+        };
+
+        // SelectedSortOption is still null while the constructor creates the first (empty) view.
+        if (SelectedSortOption is { } sort)
+            view.CustomSort = sort.Comparer;
+        return view;
     }
 
     private static bool Matches(AddonItemViewModel item, string search)
