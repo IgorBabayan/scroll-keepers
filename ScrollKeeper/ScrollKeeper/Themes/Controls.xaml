@@ -893,7 +893,7 @@
 
     <!--
         Collapsible section header of a grouped list (Installed: Addons / Libraries).
-        A chevron that points down while expanded and right while collapsed, then the header content.
+        A chevron that points down while expanded and right while collapsed (glyph swap: a trigger cannot target a named transform), then the header content.
     -->
     <Style x:Key="GroupHeaderToggleButtonStyle" TargetType="ToggleButton">
         <Setter Property="Foreground" Value="{DynamicResource WindowForegroundBrush}" />
@@ -925,12 +925,7 @@
                                        FontFamily="{StaticResource IconFont}"
                                        FontSize="10"
                                        Foreground="{DynamicResource SecondaryForegroundBrush}"
-                                       RenderTransformOrigin="0.5,0.5"
-                                       Text="&#xE70D;">
-                                <TextBlock.RenderTransform>
-                                    <RotateTransform x:Name="ChevronRotation" Angle="-90" />
-                                </TextBlock.RenderTransform>
-                            </TextBlock>
+                                       Text="&#xE76C;" />
                             <ContentPresenter Grid.Column="1"
                                               VerticalAlignment="Center"
                                               HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" />
@@ -938,7 +933,7 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsChecked" Value="True">
-                            <Setter TargetName="ChevronRotation" Property="Angle" Value="0" />
+                            <Setter TargetName="Chevron" Property="Text" Value="&#xE70D;" />
                         </Trigger>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ListItemHoverBackgroundBrush}" />
