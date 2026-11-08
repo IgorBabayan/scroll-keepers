@@ -1,13 +1,12 @@
 name: Release - Windows installer
 
-# Every pull request into the `release` branch builds the Windows installer
-# (download it from the run's "Artifacts" to test it before merging).
-# When the pull request is MERGED, the installer is also published:
+# Runs once for every change that lands on the `release` branch (a merged pull request or a direct push):
+# builds the Windows installer and publishes it
 #   - as a GitHub Release marked "Latest" (shown in the repo's "Releases" panel; the app's auto-update reads it),
 #   - as the "ScrollKeeper" package in GitHub Packages (shown in the repo's "Packages" panel).
+# Opening or updating a pull request into `release` does not start a build, so a merge produces exactly one run.
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, closed]
+  push:
     branches: [release]
   workflow_dispatch: # manual build + publish from the Actions tab
 
@@ -16,29 +15,22 @@ permissions:
   packages: write # push to GitHub Packages
 
 concurrency:
-  # New pushes to an open pull request cancel its previous build; publishing is never cancelled.
-  group: release-installer-${{ github.event.pull_request.number || github.ref }}-${{ github.event.action == 'closed' }}
-  cancel-in-progress: ${{ github.event.action != 'closed' }}
+  # Publishing is never cancelled; runs for `release` queue one after another.
+  group: release-installer-${{ github.ref }}
+  cancel-in-progress: false
 
 env:
   PROJECT: ScrollKeeper/ScrollKeeper/ScrollKeeper.csproj
   RUNTIME: win-x64
   CONFIGURATION: Release
-  # Publish only for merged pull requests and manual runs.
-  PUBLISH: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true }}
 
 jobs:
   build-installer:
-    # Skip pull requests that were closed without merging.
-    if: github.event_name == 'workflow_dispatch' || github.event.action != 'closed' || github.event.pull_request.merged == true
     runs-on: windows-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          # Merged: the merge commit on `release`. Open pull request: the default test merge of the PR.
-          ref: ${{ github.event.pull_request.merged == true && github.event.pull_request.merge_commit_sha || '' }}
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -56,7 +48,7 @@ jobs:
           $version = "$($parts[0]).$($parts[1]).$env:GITHUB_RUN_NUMBER"
           "version=$version" >> $env:GITHUB_OUTPUT
           "tag=v$version"    >> $env:GITHUB_OUTPUT
-          Write-Host "Version: $version (publish: $env:PUBLISH)"
+          Write-Host "Version: $version"
 
       - name: Restore
         run: dotnet restore ${{ env.PROJECT }} -r ${{ env.RUNTIME }}
@@ -105,29 +97,27 @@ jobs:
           if-no-files-found: error
 
       - name: Publish GitHub Release
-        if: env.PUBLISH == 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           name: ScrollKeeper ${{ steps.version.outputs.version }}
-          target_commitish: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
+          target_commitish: ${{ github.sha }}
           body: |
-            Windows installer built from ${{ github.event.pull_request.html_url || github.sha }}
-            ${{ github.event.pull_request.title }}
+            Windows installer built from ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
           generate_release_notes: true
           make_latest: true
           files: dist/*.exe
           fail_on_unmatched_files: true
 
       - name: Setup NuGet
-        if: env.PUBLISH == 'true'
         uses: nuget/setup-nuget@v2
 
       - name: Pack for GitHub Packages
-        if: env.PUBLISH == 'true'
         shell: pwsh
         run: |
+          # BasePath = repository root, so the nuspec finds LICENSE at the package root (fixes NU5030).
           nuget pack installer\ScrollKeeper.nuspec `
+            -BasePath "$env:GITHUB_WORKSPACE" `
             -Version "${{ steps.version.outputs.version }}" `
             -Properties "version=${{ steps.version.outputs.version }};installer=${{ steps.installer.outputs.path }};repoUrl=${{ github.server_url }}/${{ github.repository }}" `
             -OutputDirectory dist `
@@ -135,7 +125,6 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Push to GitHub Packages
-        if: env.PUBLISH == 'true'
         shell: pwsh
         run: |
           dotnet nuget push "dist\ScrollKeeper.${{ steps.version.outputs.version }}.nupkg" `
