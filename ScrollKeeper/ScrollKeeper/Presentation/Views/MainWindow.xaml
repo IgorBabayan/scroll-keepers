@@ -62,13 +62,13 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
-                    <!-- Scroll glyph in the accent color, like the spark next to "Claude". -->
-                    <TextBlock Margin="0,0,8,0"
-                               VerticalAlignment="Center"
-                               FontFamily="{StaticResource IconFont}"
-                               FontSize="13"
-                               Foreground="{DynamicResource AccentBrush}"
-                               Text="&#xE8F1;" />
+                    <!-- Application icon (App.ico, embedded as a WPF resource). -->
+                    <Image Width="16"
+                           Height="16"
+                           Margin="0,0,8,0"
+                           VerticalAlignment="Center"
+                           RenderOptions.BitmapScalingMode="HighQuality"
+                           Source="pack://application:,,,/App.ico" />
                     <TextBlock x:Name="TitleText"
                                Text="{Binding Title, RelativeSource={RelativeSource AncestorType=Window}}"
                                FontSize="12"

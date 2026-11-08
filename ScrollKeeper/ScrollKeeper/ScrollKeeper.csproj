@@ -20,4 +20,9 @@
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
     </ItemGroup>
 
+    <ItemGroup>
+        <!-- Also embed the icon as a WPF resource so XAML can show it via pack URI. -->
+        <Resource Include="App.ico" />
+    </ItemGroup>
+
 </Project>
