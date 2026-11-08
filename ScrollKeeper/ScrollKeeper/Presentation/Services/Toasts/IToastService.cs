@@ -1,0 +1,26 @@
+using System.Collections.ObjectModel;
+
+namespace ScrollKeeper.Presentation.Services.Toasts;
+
+/// <summary>
+/// Shows toast messages. Toasts are transient: what still needs attention goes to the action center (INotificationCenter).
+/// Must be used from the UI thread.
+/// </summary>
+public interface IToastService
+{
+    /// <summary>Visible toasts, oldest first (the newest is shown at the bottom).</summary>
+    ReadOnlyObservableCollection<Toast> Toasts { get; }
+
+    /// <summary>Closes a toast (bound to the × button).</summary>
+    IRelayCommand<Toast> DismissCommand { get; }
+
+    /// <summary>Shows a toast that closes by itself after <paramref name="duration"/> (default 5 seconds).</summary>
+    Toast Show(string message, ToastSeverity severity = ToastSeverity.Info, TimeSpan? duration = null);
+
+    /// <summary>
+    /// Shows a toast that stays until <see cref="Dismiss"/> is called (progress, countdown).
+    /// </summary>
+    Toast ShowPersistent(string message, ToastSeverity severity = ToastSeverity.Info, bool isClosable = false);
+
+    void Dismiss(Toast toast);
+}

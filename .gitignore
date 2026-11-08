@@ -55,3 +55,7 @@ CodeCoverage/
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
+
+# ScrollKeeper release outputs (dotnet publish / Inno Setup / nuget pack)
+publish/
+dist/

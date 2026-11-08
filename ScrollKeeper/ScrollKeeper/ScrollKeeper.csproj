@@ -1,0 +1,28 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>WinExe</OutputType>
+        <TargetFramework>net10.0-windows</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <UseWPF>true</UseWPF>
+        <AssemblyName>ScrollKeeper</AssemblyName>
+        <RootNamespace>ScrollKeeper</RootNamespace>
+        <Product>ScrollKeeper</Product>
+        <Description>Keeps your Elder Scrolls Online addons organized and updated.</Description>
+        <!-- Major.Minor for releases; CI appends the build number as the patch part. -->
+        <VersionPrefix>0.1.0</VersionPrefix>
+        <ApplicationIcon>App.ico</ApplicationIcon>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <!-- Also embed the icon as a WPF resource so XAML can show it via pack URI. -->
+        <Resource Include="App.ico" />
+    </ItemGroup>
+
+</Project>

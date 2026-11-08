@@ -1,0 +1,207 @@
+<!--
+    Templates shared by the Installed and Browse tabs and the addon page.
+    Both tabs show the same AddonItemViewModel instances, so a running install shows its progress in each of them.
+-->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:addons="clr-namespace:ScrollKeeper.Presentation.ViewModels.Addons">
+
+    <!-- Rounded icon: the addon's own picture once loaded, its initial until then. -->
+    <DataTemplate x:Key="AddonIconTemplate" DataType="{x:Type addons:AddonItemViewModel}">
+        <Grid>
+            <Border Style="{StaticResource AddonIconBorderStyle}">
+                <TextBlock HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           FontFamily="{StaticResource HeadingFont}"
+                           FontSize="18"
+                           Foreground="{DynamicResource AccentBrush}"
+                           Text="{Binding Initial}" />
+            </Border>
+            <Border CornerRadius="8"
+                    BorderThickness="1"
+                    BorderBrush="{DynamicResource WindowBorderBrush}"
+                    Visibility="{Binding HasIcon, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <Border.Background>
+                    <ImageBrush ImageSource="{Binding Icon}" Stretch="UniformToFill" />
+                </Border.Background>
+            </Border>
+        </Grid>
+    </DataTemplate>
+
+    <!--
+        Remove button, then the Install / Update button, "Installed" label or the progress of a running install:
+        the button hides itself while the addon downloads and installs, and the progress bar takes its place.
+    -->
+    <DataTemplate x:Key="AddonActionTemplate" DataType="{x:Type addons:AddonItemViewModel}">
+        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+            <!-- Remove: the addon, its settings and the libraries nothing else uses (asks first). -->
+            <Button Width="28"
+                    Height="28"
+                    Margin="0,0,8,0"
+                    VerticalAlignment="Center"
+                    Style="{StaticResource SubtleIconButtonStyle}"
+                    ToolTip="Remove this addon, its settings and unused libraries"
+                    AutomationProperties.Name="{Binding Name, StringFormat='Remove {0}'}"
+                    Command="{Binding RemoveCommand}"
+                    Visibility="{Binding ShowRemoveButton, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <TextBlock FontFamily="{StaticResource IconFont}" FontSize="13" Text="&#xE74D;" />
+            </Button>
+            <Grid MinWidth="150" VerticalAlignment="Center">
+                <Button HorizontalAlignment="Right"
+                        Style="{StaticResource CompactAccentButtonStyle}"
+                        Content="Install"
+                        ToolTip="Download and install this addon"
+                        AutomationProperties.Name="{Binding Name, StringFormat='Install {0}'}"
+                        Command="{Binding InstallCommand}"
+                        Visibility="{Binding ShowInstallButton, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
+                <Button HorizontalAlignment="Right"
+                        Style="{StaticResource CompactAccentButtonStyle}"
+                        Content="Update"
+                        AutomationProperties.Name="{Binding Name, StringFormat='Update {0}'}"
+                        Command="{Binding InstallCommand}"
+                        Visibility="{Binding ShowUpdateButton, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Button.ToolTip>
+                        <TextBlock>
+                            <Run Text="Update to" />
+                            <Run Text="{Binding LatestVersion, Mode=OneWay}" />
+                        </TextBlock>
+                    </Button.ToolTip>
+                </Button>
+
+                <StackPanel HorizontalAlignment="Right"
+                            Orientation="Horizontal"
+                            Visibility="{Binding ShowInstalledLabel, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <TextBlock VerticalAlignment="Center"
+                               FontFamily="{StaticResource IconFont}"
+                               FontSize="12"
+                               Foreground="{DynamicResource SuccessForegroundBrush}"
+                               Text="&#xE73E;" />
+                    <TextBlock Margin="6,0,4,0"
+                               VerticalAlignment="Center"
+                               FontSize="12"
+                               Foreground="{DynamicResource SecondaryForegroundBrush}"
+                               Text="Installed" />
+                </StackPanel>
+
+                <StackPanel Width="150"
+                            HorizontalAlignment="Right"
+                            Visibility="{Binding IsBusy, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <ProgressBar Minimum="0"
+                                 Maximum="100"
+                                 Value="{Binding Progress, Mode=OneWay}"
+                                 IsIndeterminate="{Binding IsProgressIndeterminate, Mode=OneWay}"
+                                 AutomationProperties.Name="{Binding ProgressText}" />
+                    <TextBlock Margin="0,4,0,0"
+                               FontSize="11"
+                               TextTrimming="CharacterEllipsis"
+                               Foreground="{DynamicResource SecondaryForegroundBrush}"
+                               Text="{Binding ProgressText}" />
+                </StackPanel>
+            </Grid>
+        </StackPanel>
+    </DataTemplate>
+
+    <!--
+        Collapsible group of a grouped addon list (Installed: Addons / Libraries).
+        The group's Name is an AddonGroup, which keeps IsExpanded across rescans and searches.
+    -->
+    <GroupStyle x:Key="AddonGroupStyle" HidesIfEmpty="True">
+        <GroupStyle.ContainerStyle>
+            <Style TargetType="GroupItem">
+                <Setter Property="Focusable" Value="False" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="GroupItem">
+                            <StackPanel>
+                                <ToggleButton Margin="0,4,0,2"
+                                              Style="{StaticResource GroupHeaderToggleButtonStyle}"
+                                              IsChecked="{Binding Name.IsExpanded, Mode=TwoWay}"
+                                              AutomationProperties.Name="{Binding Name.Title}"
+                                              ToolTip="Show or hide this group">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock VerticalAlignment="Center"
+                                                   FontSize="13"
+                                                   FontWeight="SemiBold"
+                                                   Text="{Binding Name.Title}" />
+                                        <Border Margin="8,0,0,0"
+                                                Padding="6,0"
+                                                MinWidth="18"
+                                                CornerRadius="9"
+                                                VerticalAlignment="Center"
+                                                Background="{DynamicResource ControlBackgroundBrush}">
+                                            <TextBlock HorizontalAlignment="Center"
+                                                       FontSize="11"
+                                                       Foreground="{DynamicResource SecondaryForegroundBrush}"
+                                                       Text="{Binding ItemCount}" />
+                                        </Border>
+                                    </StackPanel>
+                                </ToggleButton>
+                                <ItemsPresenter Visibility="{Binding Name.IsExpanded, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                            </StackPanel>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+        </GroupStyle.ContainerStyle>
+    </GroupStyle>
+
+    <!-- One addon row; the whole row opens the addon page. -->
+    <DataTemplate x:Key="AddonRowTemplate" DataType="{x:Type addons:AddonItemViewModel}">
+        <Button Style="{StaticResource ListRowButtonStyle}"
+                Padding="10,8,10,8"
+                Command="{Binding OpenDetailsCommand}"
+                AutomationProperties.Name="{Binding Name}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="44" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <ContentPresenter Grid.Column="0"
+                                  Width="44"
+                                  Height="44"
+                                  Content="{Binding}"
+                                  ContentTemplate="{StaticResource AddonIconTemplate}" />
+
+                <StackPanel Grid.Column="1" Margin="12,0,16,0" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock FontSize="14"
+                                   FontWeight="SemiBold"
+                                   TextTrimming="CharacterEllipsis"
+                                   Text="{Binding Name}" />
+                        <Border Margin="8,0,0,0"
+                                Style="{StaticResource BadgeBorderStyle}"
+                                BorderBrush="{DynamicResource ControlBorderBrush}"
+                                Visibility="{Binding IsLibrary, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <TextBlock FontSize="10" Foreground="{DynamicResource SecondaryForegroundBrush}" Text="Library" />
+                        </Border>
+                        <Border Margin="8,0,0,0"
+                                Style="{StaticResource BadgeBorderStyle}"
+                                BorderBrush="{DynamicResource AccentBrush}"
+                                Visibility="{Binding HasUpdate, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <TextBlock FontSize="10" Foreground="{DynamicResource AccentBrush}" Text="Update available" />
+                        </Border>
+                    </StackPanel>
+                    <TextBlock Margin="0,2,0,0"
+                               FontSize="12"
+                               TextTrimming="CharacterEllipsis"
+                               Foreground="{DynamicResource SecondaryForegroundBrush}"
+                               Text="{Binding Byline}" />
+                    <TextBlock Margin="0,2,0,0"
+                               FontSize="11"
+                               TextTrimming="CharacterEllipsis"
+                               Foreground="{DynamicResource SecondaryForegroundBrush}"
+                               Text="{Binding Details}" />
+                </StackPanel>
+
+                <ContentPresenter Grid.Column="2"
+                                  VerticalAlignment="Center"
+                                  Content="{Binding}"
+                                  ContentTemplate="{StaticResource AddonActionTemplate}" />
+            </Grid>
+        </Button>
+    </DataTemplate>
+
+</ResourceDictionary>
