@@ -208,17 +208,67 @@ public sealed class AddonInstaller(IAddonCatalog catalog, HttpClient http, IInst
             CopyDirectory(directory, Path.Combine(target, Path.GetFileName(directory)));
     }
 
-    /// <summary>Deletes a folder, including read-only files (some archives carry that attribute).</summary>
+    private const int DeleteAttempts = 5;
+
+    /// <summary>
+    /// Deletes a folder, including read-only files and folders (some archives carry that attribute, and OneDrive
+    /// sets it on synced folders). Retries briefly: OneDrive, antivirus or Explorer often hold a folder for a moment.
+    /// </summary>
     internal static void DeleteDirectory(string path)
     {
-        foreach (var file in Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories))
+        for (var attempt = 1; ; attempt++)
         {
-            var attributes = File.GetAttributes(file);
-            if ((attributes & FileAttributes.ReadOnly) != 0)
-                File.SetAttributes(file, attributes & ~FileAttributes.ReadOnly);
-        }
+            try
+            {
+                if (!Directory.Exists(path))
+                    return;
 
-        Directory.Delete(path, recursive: true);
+                ClearReadOnly(path);
+                Directory.Delete(path, recursive: true);
+                return;
+            }
+            catch (DirectoryNotFoundException)
+            {
+                return;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException && attempt < DeleteAttempts)
+            {
+                Debug.WriteLine($"Delete of {path} failed (attempt {attempt}): {ex.Message}");
+                Thread.Sleep(250 * attempt);
+            }
+        }
+    }
+
+    /// <summary>Windows refuses to delete a read-only file or folder: clear the flag on the folder and everything in it.</summary>
+    private static void ClearReadOnly(string path)
+    {
+        var root = new DirectoryInfo(path);
+        ClearReadOnly(root);
+
+        var options = new EnumerationOptions
+        {
+            RecurseSubdirectories = true,
+            AttributesToSkip = 0,
+            IgnoreInaccessible = true,
+        };
+
+        foreach (var entry in root.EnumerateFileSystemInfos("*", options))
+            ClearReadOnly(entry);
+    }
+
+    private static void ClearReadOnly(FileSystemInfo entry)
+    {
+        try
+        {
+            var attributes = entry.Attributes;
+            if ((attributes & FileAttributes.ReadOnly) != 0)
+                entry.Attributes = attributes & ~FileAttributes.ReadOnly;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Directory.Delete reports it if it still matters.
+            Debug.WriteLine($"Could not clear read-only on {entry.FullName}: {ex.Message}");
+        }
     }
 
     private static void TryDeleteDirectory(string path)

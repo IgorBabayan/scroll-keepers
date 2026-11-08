@@ -319,7 +319,7 @@ public sealed partial class MainViewModel : ViewModelBase, IAddonActions
         {
             Debug.WriteLine($"Removal of {name} failed: {ex}");
             _toasts.Show($"Could not remove {name}", ToastSeverity.Error).Details =
-                $"{ex.Message} Close the game and try again.";
+                $"{ex.Message} {LockedFolderHint(folder)}";
             item.EndInstall();
             // Part of it may be gone already.
             await RefreshInstalledAsync();
@@ -619,6 +619,12 @@ public sealed partial class MainViewModel : ViewModelBase, IAddonActions
     private static bool IsInstallError(Exception ex) =>
         ex is HttpRequestException or IOException or UnauthorizedAccessException or InvalidDataException
             or OperationCanceledException or ArgumentException or System.Text.Json.JsonException;
+
+    /// <summary>What usually holds an addon folder open, besides the game.</summary>
+    private static string LockedFolderHint(string addonsFolder) =>
+        addonsFolder.Contains("OneDrive", StringComparison.OrdinalIgnoreCase)
+            ? "Close the game and any Explorer window showing that folder. Your AddOns folder is in OneDrive: pause OneDrive syncing and try again."
+            : "Close the game and any Explorer window showing that folder, then try again.";
 
     private static string Describe(Exception ex) => ex switch
     {
