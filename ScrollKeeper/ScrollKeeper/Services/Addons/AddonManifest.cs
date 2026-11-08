@@ -13,7 +13,9 @@ public sealed partial record AddonManifest(
     string Version,
     int AddOnVersion,
     bool IsLibrary,
-    string Description)
+    string Description,
+    IReadOnlyList<AddonDependency> DependsOn,
+    IReadOnlyList<AddonDependency> OptionalDependsOn)
 {
     /// <summary>Manifest files are small; stop reading suspiciously large ones.</summary>
     private const int MaxLines = 400;
@@ -21,6 +23,8 @@ public sealed partial record AddonManifest(
     public static AddonManifest Parse(IEnumerable<string> lines, string fallbackTitle)
     {
         var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var dependsOn = new List<AddonDependency>();
+        var optionalDependsOn = new List<AddonDependency>();
 
         foreach (var raw in lines.Take(MaxLines))
         {
@@ -34,6 +38,20 @@ public sealed partial record AddonManifest(
 
             var key = line[2..separator].Trim();
             var value = line[(separator + 1)..].Trim();
+
+            // Unlike other headers, the game reads every DependsOn line, not only the first.
+            if (key.Equals("DependsOn", StringComparison.OrdinalIgnoreCase))
+            {
+                AddonDependency.ParseList(value, dependsOn);
+                continue;
+            }
+
+            if (key.Equals("OptionalDependsOn", StringComparison.OrdinalIgnoreCase))
+            {
+                AddonDependency.ParseList(value, optionalDependsOn);
+                continue;
+            }
+
             // The first occurrence wins, like in the game.
             if (key.Length > 0)
                 headers.TryAdd(key, value);
@@ -48,7 +66,9 @@ public sealed partial record AddonManifest(
             StripFormatting(headers.GetValueOrDefault("Version")),
             addOnVersion,
             string.Equals(headers.GetValueOrDefault("IsLibrary"), "true", StringComparison.OrdinalIgnoreCase),
-            StripFormatting(headers.GetValueOrDefault("Description")));
+            StripFormatting(headers.GetValueOrDefault("Description")),
+            dependsOn,
+            optionalDependsOn);
     }
 
     /// <summary>Reads the manifest of an addon folder, or returns <c>null</c> if the folder is not an addon.</summary>

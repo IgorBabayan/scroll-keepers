@@ -38,6 +38,7 @@ static class ServiceCollectionExtensions
             services.AddSingleton<ILocalAddonScanner, LocalAddonScanner>();
             services.AddSingleton<IInstallRecordStore, JsonInstallRecordStore>();
             services.AddSingleton<IAddonInstaller, AddonInstaller>();
+            services.AddSingleton<IDependencyResolver, DependencyResolver>();
 
             return services;
         }

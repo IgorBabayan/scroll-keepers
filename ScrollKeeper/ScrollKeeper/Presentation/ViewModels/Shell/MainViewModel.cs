@@ -28,6 +28,7 @@ public sealed partial class MainViewModel : ViewModelBase, IAddonActions
     private readonly ILocalAddonScanner _scanner;
     private readonly IInstallRecordStore _records;
     private readonly IAddonInstaller _installer;
+    private readonly IDependencyResolver _dependencies;
     private readonly IImageCache _images;
     private readonly IToastService _toasts;
     private readonly IWindowService _windows;
@@ -52,6 +53,7 @@ public sealed partial class MainViewModel : ViewModelBase, IAddonActions
         ILocalAddonScanner scanner,
         IInstallRecordStore records,
         IAddonInstaller installer,
+        IDependencyResolver dependencies,
         IImageCache images,
         IToastService toasts,
         IWindowService windows)
@@ -61,6 +63,7 @@ public sealed partial class MainViewModel : ViewModelBase, IAddonActions
         _scanner = scanner;
         _records = records;
         _installer = installer;
+        _dependencies = dependencies;
         _images = images;
         _toasts = toasts;
         _windows = windows;
@@ -213,28 +216,133 @@ public sealed partial class MainViewModel : ViewModelBase, IAddonActions
         }
 
         var wasInstalled = item.IsInstalled;
+        // Dependency rows stay busy until the final rescan, so their buttons do not flicker.
+        var busy = new List<AddonItemViewModel> { item };
         item.BeginInstall();
         try
         {
             var progress = new Progress<InstallProgress>(item.ReportProgress);
-            await _installer.InstallAsync(addon, folder, progress);
+            InstallRecord record;
+            try
+            {
+                record = await _installer.InstallAsync(addon, folder, progress);
+            }
+            catch (Exception ex) when (IsInstallError(ex))
+            {
+                Debug.WriteLine($"Install of {addon.Name} failed: {ex}");
+                _toasts.Show($"Could not install {item.Name}", ToastSeverity.Error).Details = Describe(ex);
+                return;
+            }
+
+            var dependencies = await InstallDependenciesAsync(item, record, folder, busy);
             await RefreshInstalledAsync();
 
+            var details = $"Version {item.InstalledVersion}";
+            if (dependencies.Installed.Count > 0)
+                details += $"\nAlso installed: {string.Join(", ", dependencies.Installed)}";
             _toasts.Show(wasInstalled ? $"{item.Name} updated" : $"{item.Name} installed", ToastSeverity.Success)
-                .Details = $"Version {item.InstalledVersion}";
+                .Details = details;
+
+            if (dependencies.HasProblems)
+            {
+                var lines = new List<string>(2);
+                if (dependencies.Unavailable.Count > 0)
+                    lines.Add($"Not found on ESOUI: {string.Join(", ", dependencies.Unavailable)}");
+                if (dependencies.Failed.Count > 0)
+                    lines.Add($"Could not install: {string.Join("; ", dependencies.Failed)}");
+                _toasts.Show($"{item.Name} is missing dependencies", ToastSeverity.Warning).Details = string.Join("\n", lines);
+            }
         }
         catch (Exception ex) when (IsInstallError(ex))
         {
-            Debug.WriteLine($"Install of {addon.Name} failed: {ex}");
-            _toasts.Show($"Could not install {item.Name}", ToastSeverity.Error).Details = Describe(ex);
+            // The rescan after the install failed; the addon itself is installed.
+            Debug.WriteLine($"Refresh after installing {addon.Name} failed: {ex}");
+            _toasts.Show("Could not read the AddOns folder", ToastSeverity.Error).Details = Describe(ex);
         }
         finally
         {
-            item.EndInstall();
+            foreach (var busyItem in busy)
+                busyItem.EndInstall();
         }
     }
 
     public void OpenDetails(AddonItemViewModel item) => _windows.ShowAddonDetails(item);
+
+    // ===== Dependencies =====
+
+    private sealed record DependencyOutcome(
+        IReadOnlyList<string> Installed,
+        IReadOnlyList<string> Unavailable,
+        IReadOnlyList<string> Failed)
+    {
+        public bool HasProblems => Unavailable.Count > 0 || Failed.Count > 0;
+    }
+
+    /// <summary>
+    /// Installs (or updates) the required libraries of a freshly installed addon that AddOns does not have
+    /// in a sufficient version, then their own requirements, and so on.
+    /// Each dependency shows its progress on its own row; <paramref name="owner"/> shows which one is in progress.
+    /// </summary>
+    private async Task<DependencyOutcome> InstallDependenciesAsync(
+        AddonItemViewModel owner,
+        InstallRecord record,
+        string folder,
+        List<AddonItemViewModel> busy)
+    {
+        var installed = new List<string>();
+        var unavailable = new List<string>();
+        var failed = new List<string>();
+
+        var catalog = _snapshot?.Addons ?? [];
+        var handled = new HashSet<string>(StringComparer.Ordinal) { record.AddonId };
+        var pending = new Queue<IReadOnlyList<string>>();
+        pending.Enqueue(record.Directories);
+
+        while (pending.TryDequeue(out var directories))
+        {
+            owner.ReportStatus("Checking dependencies…");
+            var missing = await Task.Run(() => _dependencies.FindMissing(folder, directories, catalog));
+
+            foreach (var dependency in missing)
+            {
+                if (dependency.Source is not { } source)
+                {
+                    var text = dependency.InstalledAddOnVersion is { } version
+                        ? $"{dependency.Dependency} (installed {version})"
+                        : dependency.Dependency.ToString();
+                    if (!unavailable.Contains(text, StringComparer.OrdinalIgnoreCase))
+                        unavailable.Add(text);
+                    continue;
+                }
+
+                if (!handled.Add(source.Id))
+                    continue;
+
+                var item = GetOrCreateItem(source.Id);
+                // Already being installed, e.g. by "Update all" or as a dependency of another addon.
+                if (item.IsBusy)
+                    continue;
+
+                owner.ReportStatus($"Installing {source.Name}…");
+                item.BeginInstall();
+                busy.Add(item);
+                try
+                {
+                    var progress = new Progress<InstallProgress>(item.ReportProgress);
+                    var dependencyRecord = await _installer.InstallAsync(source, folder, progress);
+                    installed.Add(source.Name);
+                    pending.Enqueue(dependencyRecord.Directories);
+                }
+                catch (Exception ex) when (IsInstallError(ex))
+                {
+                    Debug.WriteLine($"Install of dependency {source.Name} failed: {ex}");
+                    failed.Add($"{source.Name} ({Describe(ex)})");
+                }
+            }
+        }
+
+        return new DependencyOutcome(installed, unavailable, failed);
+    }
 
     // ===== Loading =====
 

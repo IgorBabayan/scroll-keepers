@@ -207,6 +207,14 @@ public sealed partial class AddonItemViewModel : ViewModelBase
             : $"{verb}…";
     }
 
+    /// <summary>Shows a step without a known fraction, e.g. while dependencies are installed.</summary>
+    public void ReportStatus(string text)
+    {
+        IsProgressIndeterminate = true;
+        Progress = 0;
+        ProgressText = text;
+    }
+
     public void EndInstall()
     {
         IsBusy = false;
