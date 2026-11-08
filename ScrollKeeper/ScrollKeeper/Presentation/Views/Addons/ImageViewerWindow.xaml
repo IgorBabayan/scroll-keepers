@@ -1,0 +1,131 @@
+<Window x:Class="ScrollKeeper.Presentation.Views.Addons.ImageViewerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        xmlns:addons="clr-namespace:ScrollKeeper.Presentation.ViewModels.Addons"
+        mc:Ignorable="d"
+        d:DataContext="{d:DesignInstance Type=addons:ImageViewerViewModel, IsDesignTimeCreatable=False}"
+        Title="{Binding Title}"
+        Width="1100"
+        Height="760"
+        MinWidth="480"
+        MinHeight="360"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        FontFamily="{StaticResource BodyFont}"
+        Background="{DynamicResource WindowBackgroundBrush}"
+        Foreground="{DynamicResource WindowForegroundBrush}">
+
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="32"
+                            ResizeBorderThickness="6"
+                            CornerRadius="0"
+                            GlassFrameThickness="0"
+                            UseAeroCaptionButtons="False" />
+    </shell:WindowChrome.WindowChrome>
+
+    <Window.InputBindings>
+        <KeyBinding Key="Escape" Command="{x:Static SystemCommands.CloseWindowCommand}" />
+        <KeyBinding Key="Left" Command="{Binding PreviousCommand}" />
+        <KeyBinding Key="Right" Command="{Binding NextCommand}" />
+    </Window.InputBindings>
+
+    <Window.CommandBindings>
+        <CommandBinding Command="{x:Static SystemCommands.CloseWindowCommand}" Executed="OnCloseExecuted" />
+    </Window.CommandBindings>
+
+    <Border BorderBrush="{DynamicResource WindowBorderBrush}" BorderThickness="1">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="32" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <!-- ===== Title bar ===== -->
+            <Grid Grid.Row="0" Background="{DynamicResource TitleBarBackgroundBrush}">
+                <TextBlock Margin="12,0,100,0"
+                           VerticalAlignment="Center"
+                           FontSize="12"
+                           TextTrimming="CharacterEllipsis"
+                           Text="{Binding Title, RelativeSource={RelativeSource AncestorType=Window}}" />
+                <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
+                    <Button Style="{StaticResource TitleBarToolButtonStyle}"
+                            ToolTip="Open in browser"
+                            Content="&#xE8A7;"
+                            AutomationProperties.Name="Open in browser"
+                            Command="{Binding OpenInBrowserCommand}" />
+                    <Button Style="{StaticResource CloseCaptionButtonStyle}"
+                            ToolTip="Close (Esc)"
+                            Content="&#xE8BB;"
+                            AutomationProperties.Name="Close"
+                            Command="{x:Static SystemCommands.CloseWindowCommand}" />
+                </StackPanel>
+            </Grid>
+
+            <!-- ===== Picture ===== -->
+            <Grid Grid.Row="1" Margin="16">
+                <Image Source="{Binding Image}"
+                       Stretch="Uniform"
+                       StretchDirection="DownOnly"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"
+                       RenderOptions.BitmapScalingMode="HighQuality" />
+
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"
+                            Visibility="{Binding HasError, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <TextBlock Style="{StaticResource SecondaryTextStyle}"
+                               HorizontalAlignment="Center"
+                               Text="Could not load the full picture." />
+                    <Button Margin="0,8,0,0"
+                            HorizontalAlignment="Center"
+                            Style="{StaticResource TextLinkButtonStyle}"
+                            Content="Open in browser"
+                            Command="{Binding OpenInBrowserCommand}" />
+                </StackPanel>
+
+                <Button HorizontalAlignment="Left"
+                        VerticalAlignment="Center"
+                        Width="40"
+                        Height="40"
+                        Focusable="False"
+                        FontFamily="{StaticResource IconFont}"
+                        Style="{StaticResource IconButtonStyle}"
+                        ToolTip="Previous (&#x2190;)"
+                        Content="&#xE76B;"
+                        AutomationProperties.Name="Previous picture"
+                        Visibility="{Binding HasMany, Converter={StaticResource BooleanToVisibilityConverter}}"
+                        Command="{Binding PreviousCommand}" />
+
+                <Button HorizontalAlignment="Right"
+                        VerticalAlignment="Center"
+                        Width="40"
+                        Height="40"
+                        Focusable="False"
+                        FontFamily="{StaticResource IconFont}"
+                        Style="{StaticResource IconButtonStyle}"
+                        ToolTip="Next (&#x2192;)"
+                        Content="&#xE76C;"
+                        AutomationProperties.Name="Next picture"
+                        Visibility="{Binding HasMany, Converter={StaticResource BooleanToVisibilityConverter}}"
+                        Command="{Binding NextCommand}" />
+            </Grid>
+
+            <!-- ===== Footer: position and loading state ===== -->
+            <StackPanel Grid.Row="2"
+                        Margin="0,0,0,12"
+                        HorizontalAlignment="Center"
+                        Orientation="Horizontal">
+                <TextBlock Style="{StaticResource SecondaryTextStyle}"
+                           Visibility="{Binding HasMany, Converter={StaticResource BooleanToVisibilityConverter}}"
+                           Text="{Binding Position}" />
+                <TextBlock Margin="12,0,0,0"
+                           Style="{StaticResource SecondaryTextStyle}"
+                           Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}"
+                           Text="Loading full picture&#x2026;" />
+            </StackPanel>
+        </Grid>
+    </Border>
+</Window>

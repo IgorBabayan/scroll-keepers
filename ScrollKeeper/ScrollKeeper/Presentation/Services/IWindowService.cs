@@ -10,4 +10,7 @@ public interface IWindowService
 
     /// <summary>Shows the page of an addon (modal).</summary>
     void ShowAddonDetails(AddonItemViewModel item);
+
+    /// <summary>Shows the full-size pictures of an addon page, starting at <paramref name="index"/> (modal).</summary>
+    void ShowImageViewer(string title, IReadOnlyList<ScreenshotViewModel> pictures, int index);
 }

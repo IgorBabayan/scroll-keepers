@@ -21,6 +21,16 @@ public sealed class WindowService(IServiceProvider services) : IWindowService
         ShowModal(new AddonDetailsWindow(viewModel));
     }
 
+    public void ShowImageViewer(string title, IReadOnlyList<ScreenshotViewModel> pictures, int index)
+    {
+        ArgumentNullException.ThrowIfNull(pictures);
+        if (pictures.Count == 0)
+            return;
+
+        var viewModel = ActivatorUtilities.CreateInstance<ImageViewerViewModel>(services, title, pictures, index);
+        ShowModal(new ImageViewerWindow(viewModel));
+    }
+
     private static bool ShowModal(Window window)
     {
         var owner = WindowHelper.GetActiveWindow();

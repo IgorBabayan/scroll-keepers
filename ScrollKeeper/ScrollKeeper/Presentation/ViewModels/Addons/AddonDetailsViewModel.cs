@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Windows.Media;
 using ScrollKeeper.Presentation.Documents;
+using ScrollKeeper.Presentation.Services;
 using ScrollKeeper.Services.Catalog;
 using ScrollKeeper.Services.Images;
 
@@ -19,12 +20,14 @@ public sealed partial class AddonDetailsViewModel : ViewModelBase
 
     private readonly IAddonCatalog _catalog;
     private readonly IImageCache _images;
+    private readonly IWindowService _windows;
 
-    public AddonDetailsViewModel(AddonItemViewModel item, IAddonCatalog catalog, IImageCache images)
+    public AddonDetailsViewModel(AddonItemViewModel item, IAddonCatalog catalog, IImageCache images, IWindowService windows)
     {
         Item = item;
         _catalog = catalog;
         _images = images;
+        _windows = windows;
 
         var addon = item.Catalog;
         if (addon is not null)
@@ -172,12 +175,18 @@ public sealed partial class AddonDetailsViewModel : ViewModelBase
     [RelayCommand]
     private void OpenScreenshot(ScreenshotViewModel? screenshot)
     {
-        if (Uri.TryCreate(screenshot?.ImageUrl, UriKind.Absolute, out var uri))
-            BbCodeDocumentBuilder.OpenInBrowser(uri);
+        if (screenshot is null)
+            return;
+
+        var index = Screenshots.IndexOf(screenshot);
+        if (index < 0)
+            return;
+
+        _windows.ShowImageViewer(Title, Screenshots.ToList(), index);
     }
 }
 
-/// <summary>A picture of the addon page; the full-size image opens in the browser.</summary>
+/// <summary>A picture of the addon page; the full-size image opens in the picture viewer.</summary>
 public sealed partial class ScreenshotViewModel(string thumbnailUrl, string imageUrl) : ObservableObject
 {
     public string ThumbnailUrl { get; } = thumbnailUrl;
@@ -189,7 +198,7 @@ public sealed partial class ScreenshotViewModel(string thumbnailUrl, string imag
 
     internal async Task LoadAsync(IImageCache images, int decodeWidth)
     {
-        // ESOUI thumbnails are small; the full picture is only fetched by the browser on click.
+        // ESOUI thumbnails are small; the full picture is only fetched by the picture viewer on click.
         Image ??= await images.GetAsync(ThumbnailUrl, decodeWidth);
     }
 }
