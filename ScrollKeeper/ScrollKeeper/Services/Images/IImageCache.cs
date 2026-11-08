@@ -6,8 +6,8 @@ namespace ScrollKeeper.Services.Images;
 public interface IImageCache
 {
     /// <summary>
-    /// Returns the image decoded to <paramref name="decodeWidth"/> pixels wide (0 = original size),
-    /// or <c>null</c> if it cannot be downloaded or decoded. Never throws.
+    /// Returns the image decoded so its shorter side is <paramref name="decodeSize"/> pixels (0 = original size;
+    /// smaller images are never upscaled), or <c>null</c> if it cannot be downloaded or decoded. Never throws.
     /// </summary>
-    Task<ImageSource?> GetAsync(string url, int decodeWidth);
+    Task<ImageSource?> GetAsync(string url, int decodeSize);
 }

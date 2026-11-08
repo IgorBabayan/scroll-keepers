@@ -12,8 +12,8 @@ namespace ScrollKeeper.Presentation.ViewModels.Addons;
 /// </summary>
 public sealed partial class AddonItemViewModel : ViewModelBase
 {
-    /// <summary>Icons are drawn at 44 px; decode at twice that for high-DPI screens.</summary>
-    private const int IconDecodeWidth = 96;
+    /// <summary>Icons are drawn at up to 64 px (addon page); decode at twice that for high-DPI screens.</summary>
+    private const int IconDecodeSize = 128;
 
     private readonly IAddonActions _actions;
     private readonly IImageCache _images;
@@ -115,6 +115,12 @@ public sealed partial class AddonItemViewModel : ViewModelBase
 
     /// <summary>Own picture: the first screenshot thumbnail, otherwise the ESOUI category icon.</summary>
     public string? IconUrl => Catalog?.Thumbnails.FirstOrDefault() ?? CategoryIconUrl;
+
+    /// <summary>
+    /// Full-size picture behind <see cref="IconUrl"/>. ESOUI thumbnails are only a few dozen pixels,
+    /// so they look blurry once scaled up to the icon; the full picture replaces them once downloaded.
+    /// </summary>
+    private string? FullIconUrl => Catalog is { Thumbnails.Count: > 0 } catalog ? catalog.Images.FirstOrDefault() : null;
 
     /// <summary>Loaded on first use, so only rows scrolled into view download their icon.</summary>
     public ImageSource? Icon
@@ -239,11 +245,26 @@ public sealed partial class AddonItemViewModel : ViewModelBase
 
     private async Task LoadIconAsync(string url)
     {
-        var image = await _images.GetAsync(url, IconDecodeWidth);
+        var fullUrl = FullIconUrl;
+
+        // The small thumbnail arrives quickly and fills the gap while the full picture downloads.
+        var thumbnail = await _images.GetAsync(url, IconDecodeSize);
         // The addon may have changed (catalog refresh) while the image was downloading.
-        if (image is null || url != IconUrl)
+        if (url != IconUrl)
+            return;
+        if (thumbnail is not null)
+            SetIcon(thumbnail);
+
+        if (string.IsNullOrWhiteSpace(fullUrl) || fullUrl == url)
             return;
 
+        var full = await _images.GetAsync(fullUrl, IconDecodeSize);
+        if (full is not null && url == IconUrl)
+            SetIcon(full);
+    }
+
+    private void SetIcon(ImageSource image)
+    {
         _icon = image;
         OnPropertyChanged(nameof(Icon));
         OnPropertyChanged(nameof(HasIcon));
