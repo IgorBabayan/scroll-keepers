@@ -3,7 +3,7 @@
     Package published to GitHub Packages on every merge into `release`
     (.github/workflows/release-installer.yml), so the repository's "Packages" panel shows the latest release.
     It carries the Windows installer in tools\. Properties passed by the workflow:
-      -Version x.y.z  -Properties "version=x.y.z;installer=<path of ScrollKeeper-Setup-x.y.z.exe>;repoUrl=<repository URL>"
+      -BasePath <repository root>  -Version x.y.z  -Properties "version=x.y.z;installer=<path of ScrollKeeper-Setup-x.y.z.exe>;repoUrl=<repository URL>"
 -->
 <package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
   <metadata>
@@ -18,7 +18,7 @@
     <tags>eso elder-scrolls-online addons addon-manager installer windows</tags>
   </metadata>
   <files>
-    <file src="..\LICENSE" target="" />
+    <file src="LICENSE" target="" />
     <file src="$installer$" target="tools" />
   </files>
 </package>

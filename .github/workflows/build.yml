@@ -1,12 +1,9 @@
 name: Build
 
-# Compiles the app on every push and pull request to `development`, so a broken build is caught
-# before it reaches a pull request into `release`.
+# Manual compile check only (Actions tab -> Build -> Run workflow).
+# Pushes to `development` no longer trigger a build; the installer is built when `release` changes
+# (see release-installer.yml).
 on:
-  push:
-    branches: [development]
-  pull_request:
-    branches: [development]
   workflow_dispatch:
 
 permissions:
