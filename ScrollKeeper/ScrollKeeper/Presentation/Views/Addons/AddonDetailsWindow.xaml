@@ -197,7 +197,7 @@
                                                         Background="{DynamicResource CardBackgroundBrush}">
                                                     <Border CornerRadius="6">
                                                         <Border.Background>
-                                                            <ImageBrush ImageSource="{Binding Image}" Stretch="UniformToFill" />
+                                                            <ImageBrush ImageSource="{Binding Image}" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" />
                                                         </Border.Background>
                                                     </Border>
                                                 </Border>

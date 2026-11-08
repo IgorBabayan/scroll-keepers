@@ -16,7 +16,8 @@ namespace ScrollKeeper.Presentation.ViewModels.Addons;
 /// </summary>
 public sealed partial class AddonDetailsViewModel : ViewModelBase
 {
-    private const int ScreenshotDecodeWidth = 320;
+    /// <summary>Tiles are 180 x 120 px and filled; decode the shorter side at twice that for high-DPI screens.</summary>
+    private const int ScreenshotDecodeSize = 360;
 
     private readonly IAddonCatalog _catalog;
     private readonly IImageCache _images;
@@ -125,7 +126,7 @@ public sealed partial class AddonDetailsViewModel : ViewModelBase
     public async Task LoadAsync()
     {
         foreach (var screenshot in Screenshots)
-            _ = screenshot.LoadAsync(_images, ScreenshotDecodeWidth);
+            _ = screenshot.LoadAsync(_images, ScreenshotDecodeSize);
 
         if (Item.Catalog is not { } addon)
             return;
@@ -196,9 +197,22 @@ public sealed partial class ScreenshotViewModel(string thumbnailUrl, string imag
     [ObservableProperty]
     private ImageSource? _image;
 
-    internal async Task LoadAsync(IImageCache images, int decodeWidth)
+    internal async Task LoadAsync(IImageCache images, int decodeSize)
     {
-        // ESOUI thumbnails are small; the full picture is only fetched by the picture viewer on click.
-        Image ??= await images.GetAsync(ThumbnailUrl, decodeWidth);
+        if (Image is not null)
+            return;
+
+        // ESOUI thumbnails are tiny and blurry when stretched over a tile: show one while the full picture
+        // downloads, then swap in the full picture (decoded small, and already on disk for the viewer).
+        var thumbnail = await images.GetAsync(ThumbnailUrl, decodeSize);
+        if (thumbnail is not null)
+            Image = thumbnail;
+
+        if (ImageUrl == ThumbnailUrl)
+            return;
+
+        var full = await images.GetAsync(ImageUrl, decodeSize);
+        if (full is not null)
+            Image = full;
     }
 }

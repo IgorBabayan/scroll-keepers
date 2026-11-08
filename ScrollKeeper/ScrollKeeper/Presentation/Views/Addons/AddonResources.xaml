@@ -22,7 +22,7 @@
                     BorderBrush="{DynamicResource WindowBorderBrush}"
                     Visibility="{Binding HasIcon, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <Border.Background>
-                    <ImageBrush ImageSource="{Binding Icon}" Stretch="UniformToFill" />
+                    <ImageBrush ImageSource="{Binding Icon}" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" />
                 </Border.Background>
             </Border>
         </Grid>

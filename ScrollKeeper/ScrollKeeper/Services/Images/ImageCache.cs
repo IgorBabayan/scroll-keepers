@@ -23,21 +23,21 @@ public sealed class ImageCache(HttpClient http) : IImageCache
     private readonly ConcurrentDictionary<string, Lazy<Task<ImageSource?>>> _memory = new();
     private readonly SemaphoreSlim _downloads = new(6, 6);
 
-    public Task<ImageSource?> GetAsync(string url, int decodeWidth)
+    public Task<ImageSource?> GetAsync(string url, int decodeSize)
     {
         if (string.IsNullOrWhiteSpace(url))
             return Task.FromResult<ImageSource?>(null);
 
-        var key = $"{decodeWidth}|{url}";
-        return _memory.GetOrAdd(key, _ => new Lazy<Task<ImageSource?>>(() => LoadAsync(url, decodeWidth))).Value;
+        var key = $"{decodeSize}|{url}";
+        return _memory.GetOrAdd(key, _ => new Lazy<Task<ImageSource?>>(() => LoadAsync(url, decodeSize))).Value;
     }
 
-    private async Task<ImageSource?> LoadAsync(string url, int decodeWidth)
+    private async Task<ImageSource?> LoadAsync(string url, int decodeSize)
     {
         try
         {
             var bytes = await GetBytesAsync(url).ConfigureAwait(false);
-            return bytes is null ? null : Decode(bytes, decodeWidth);
+            return bytes is null ? null : Decode(bytes, decodeSize);
         }
         catch (Exception ex) when (ex is HttpRequestException or IOException or UnauthorizedAccessException
                                        or OperationCanceledException or NotSupportedException or ArgumentException
@@ -86,19 +86,43 @@ public sealed class ImageCache(HttpClient http) : IImageCache
         }
     }
 
-    private static ImageSource Decode(byte[] bytes, int decodeWidth)
+    private static ImageSource Decode(byte[] bytes, int decodeSize)
     {
         using var stream = new MemoryStream(bytes);
         var image = new BitmapImage();
         image.BeginInit();
         image.CacheOption = BitmapCacheOption.OnLoad;
         image.CreateOptions = BitmapCreateOptions.IgnoreColorProfile;
-        if (decodeWidth > 0)
-            image.DecodePixelWidth = decodeWidth;
+
+        // Pictures are drawn with UniformToFill, so it is the shorter side that must stay sharp.
+        // Scaling by width alone made wide screenshots too short and they were blown up again on screen.
+        // Smaller images are left as they are: upscaling while decoding adds nothing.
+        if (decodeSize > 0)
+        {
+            var (width, height) = ReadSize(bytes);
+            if (Math.Min(width, height) > decodeSize)
+            {
+                if (width <= height)
+                    image.DecodePixelWidth = decodeSize;
+                else
+                    image.DecodePixelHeight = decodeSize;
+            }
+        }
+
         image.StreamSource = stream;
         image.EndInit();
         image.Freeze();
         return image;
+    }
+
+    /// <summary>Reads the pixel size from the header without decoding the picture.</summary>
+    private static (int Width, int Height) ReadSize(byte[] bytes)
+    {
+        using var stream = new MemoryStream(bytes);
+        var decoder = BitmapDecoder.Create(stream,
+            BitmapCreateOptions.DelayCreation | BitmapCreateOptions.IgnoreColorProfile, BitmapCacheOption.None);
+        var frame = decoder.Frames[0];
+        return (frame.PixelWidth, frame.PixelHeight);
     }
 
     private static string Hash(string url) =>
