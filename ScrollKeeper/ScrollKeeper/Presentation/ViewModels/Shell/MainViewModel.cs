@@ -214,34 +214,57 @@ public sealed partial class MainViewModel : ViewModelBase, IAddonActions
     {
         var pending = _installed.Where(i => i.HasUpdate && i.CanInstall && !i.IsBusy).ToList();
         using var throttle = new SemaphoreSlim(3, 3);
+        var updated = new List<AddonItemViewModel>();
 
         await Task.WhenAll(pending.Select(async item =>
         {
             await throttle.WaitAsync();
             try
             {
-                await InstallAsync(item);
+                // One summary in the action center instead of an entry per addon (failures are still listed).
+                if (await InstallCoreAsync(item, notify: false))
+                    updated.Add(item);
             }
             finally
             {
                 throttle.Release();
             }
         }));
+
+        if (updated.Count == 1)
+        {
+            var item = updated[0];
+            _notifications.Add($"{item.Name} updated", ToastSeverity.Success, $"Version {item.InstalledVersion}")
+                .SetAction("Open addon page", () => OpenDetails(item));
+        }
+        else if (updated.Count > 1)
+        {
+            var names = updated.Select(i => i.Name).Order(StringComparer.CurrentCultureIgnoreCase).ToList();
+            var details = string.Join(", ", names.Take(MaxListedUpdates));
+            if (names.Count > MaxListedUpdates)
+                details += $" and {names.Count - MaxListedUpdates} more";
+            _notifications.Add($"{updated.Count} addons updated", ToastSeverity.Success, details);
+        }
     }
 
     // ===== IAddonActions =====
 
-    public async Task InstallAsync(AddonItemViewModel item)
+    public Task InstallAsync(AddonItemViewModel item) => InstallCoreAsync(item, notify: true);
+
+    /// <summary>Installs or updates <paramref name="item"/> and its missing dependencies.</summary>
+    /// <param name="notify">Also record a successful install in the action center (toasts are always shown).</param>
+    /// <returns><c>true</c> if the addon was installed.</returns>
+    private async Task<bool> InstallCoreAsync(AddonItemViewModel item, bool notify)
     {
         if (item.Catalog is not { } addon || item.IsBusy)
-            return;
+            return false;
 
         var folder = _settings.AddonsFolder;
         if (!EnsureAddonsFolder(folder))
         {
             _toasts.Show("AddOns folder not found", ToastSeverity.Error).Details =
                 "Set the path to your Elder Scrolls Online AddOns folder in Settings.";
-            return;
+            return false;
         }
 
         var wasInstalled = item.IsInstalled;
@@ -262,7 +285,7 @@ public sealed partial class MainViewModel : ViewModelBase, IAddonActions
                 _toasts.Show($"Could not install {item.Name}", ToastSeverity.Error).Details = Describe(ex);
                 _notifications.Add($"Could not install {item.Name}", ToastSeverity.Error, Describe(ex))
                     .SetAction("Try again", () => _ = InstallAsync(item));
-                return;
+                return false;
             }
 
             var dependencies = await InstallDependenciesAsync(item, record, folder, busy);
@@ -271,8 +294,11 @@ public sealed partial class MainViewModel : ViewModelBase, IAddonActions
             var details = $"Version {item.InstalledVersion}";
             if (dependencies.Installed.Count > 0)
                 details += $"\nAlso installed: {string.Join(", ", dependencies.Installed)}";
-            _toasts.Show(wasInstalled ? $"{item.Name} updated" : $"{item.Name} installed", ToastSeverity.Success)
-                .Details = details;
+            var title = wasInstalled ? $"{item.Name} updated" : $"{item.Name} installed";
+            _toasts.Show(title, ToastSeverity.Success).Details = details;
+            if (notify)
+                _notifications.Add(title, ToastSeverity.Success, details)
+                    .SetAction("Open addon page", () => OpenDetails(item));
 
             if (dependencies.HasProblems)
             {
@@ -285,12 +311,15 @@ public sealed partial class MainViewModel : ViewModelBase, IAddonActions
                 _toasts.Show($"{item.Name} is missing dependencies", ToastSeverity.Warning).Details = text;
                 _notifications.Add($"{item.Name} is missing dependencies", ToastSeverity.Warning, text);
             }
+
+            return true;
         }
         catch (Exception ex) when (IsInstallError(ex))
         {
             // The rescan after the install failed; the addon itself is installed.
             Debug.WriteLine($"Refresh after installing {addon.Name} failed: {ex}");
             _toasts.Show("Could not read the AddOns folder", ToastSeverity.Error).Details = Describe(ex);
+            return true;
         }
         finally
         {
@@ -334,9 +363,9 @@ public sealed partial class MainViewModel : ViewModelBase, IAddonActions
                 details.Add($"Also removed: {string.Join(", ", plan.UnusedDependencies)}");
             if (plan.SavedVariablesFiles.Count > 0)
                 details.Add("Saved settings deleted.");
-            var toast = _toasts.Show($"{name} removed", ToastSeverity.Success);
-            if (details.Count > 0)
-                toast.Details = string.Join("\n", details);
+            var text = details.Count > 0 ? string.Join("\n", details) : null;
+            _toasts.Show($"{name} removed", ToastSeverity.Success).Details = text;
+            _notifications.Add($"{name} removed", ToastSeverity.Success, text);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
