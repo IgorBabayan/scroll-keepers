@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Package published to GitHub Packages on every merge into `release`
+    (.github/workflows/release-installer.yml), so the repository's "Packages" panel shows the latest release.
+    It carries the Windows installer in tools\. Properties passed by the workflow:
+      -Version x.y.z  -Properties "version=x.y.z;installer=<path of ScrollKeeper-Setup-x.y.z.exe>;repoUrl=<repository URL>"
+-->
+<package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
+  <metadata>
+    <id>ScrollKeeper</id>
+    <version>$version$</version>
+    <title>ScrollKeeper</title>
+    <authors>IgorBabayan</authors>
+    <description>Windows installer of ScrollKeeper, a manager that keeps your Elder Scrolls Online addons organized and updated. The installer is in the tools folder of the package; it is also attached to the GitHub Release of the same version.</description>
+    <license type="file">LICENSE</license>
+    <projectUrl>$repoUrl$</projectUrl>
+    <repository type="git" url="$repoUrl$" />
+    <tags>eso elder-scrolls-online addons addon-manager installer windows</tags>
+  </metadata>
+  <files>
+    <file src="..\LICENSE" target="" />
+    <file src="$installer$" target="tools" />
+  </files>
+</package>
