@@ -115,11 +115,13 @@ jobs:
       - name: Pack for GitHub Packages
         shell: pwsh
         run: |
-          # BasePath = repository root, so the nuspec finds LICENSE at the package root (fixes NU5030).
+          # nuget.exe does not pack the extensionless LICENSE file reliably (NU5030),
+          # so a copy named LICENSE.txt is passed to the nuspec by absolute path, like the installer.
+          $license = Join-Path $env:RUNNER_TEMP 'LICENSE.txt'
+          Copy-Item LICENSE $license -Force
           nuget pack installer\ScrollKeeper.nuspec `
-            -BasePath "$env:GITHUB_WORKSPACE" `
             -Version "${{ steps.version.outputs.version }}" `
-            -Properties "version=${{ steps.version.outputs.version }};installer=${{ steps.installer.outputs.path }};repoUrl=${{ github.server_url }}/${{ github.repository }}" `
+            -Properties "version=${{ steps.version.outputs.version }};installer=${{ steps.installer.outputs.path }};license=$license;repoUrl=${{ github.server_url }}/${{ github.repository }}" `
             -OutputDirectory dist `
             -NoPackageAnalysis
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
