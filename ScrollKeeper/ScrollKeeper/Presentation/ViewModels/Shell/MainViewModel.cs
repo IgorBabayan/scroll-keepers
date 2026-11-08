@@ -71,13 +71,20 @@ public sealed partial class MainViewModel : ViewModelBase, IAddonActions
         _toasts = toasts;
         _windows = windows;
 
-        // Installed: addons with updates first, then by name. Live sorting moves a row once it is updated.
+        // Installed: grouped into addons and libraries (in that order, groups follow the first sort key);
+        // inside a group, addons with updates first, then by name. Live sorting and grouping move a row once it
+        // is updated or its manifest changes.
         var installedView = (ListCollectionView)CollectionViewSource.GetDefaultView(_installed);
+        installedView.GroupDescriptions.Add(new PropertyGroupDescription(nameof(AddonItemViewModel.Group)));
+        installedView.SortDescriptions.Add(new SortDescription(nameof(AddonItemViewModel.GroupOrder), ListSortDirection.Ascending));
         installedView.SortDescriptions.Add(new SortDescription(nameof(AddonItemViewModel.HasUpdate), ListSortDirection.Descending));
         installedView.SortDescriptions.Add(new SortDescription(nameof(AddonItemViewModel.Name), ListSortDirection.Ascending));
         installedView.IsLiveSorting = true;
+        installedView.LiveSortingProperties.Add(nameof(AddonItemViewModel.GroupOrder));
         installedView.LiveSortingProperties.Add(nameof(AddonItemViewModel.HasUpdate));
         installedView.LiveSortingProperties.Add(nameof(AddonItemViewModel.Name));
+        installedView.IsLiveGrouping = true;
+        installedView.LiveGroupingProperties.Add(nameof(AddonItemViewModel.Group));
         installedView.Filter = o => Matches((AddonItemViewModel)o, InstalledSearchText);
         InstalledView = installedView;
 

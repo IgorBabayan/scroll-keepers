@@ -86,6 +86,12 @@ public sealed partial class AddonItemViewModel : ViewModelBase
 
     public bool IsLibrary => Installed?.MainFolder.Manifest.IsLibrary == true;
 
+    /// <summary>Section of the Installed list the addon is shown in.</summary>
+    public AddonGroup Group => IsLibrary ? AddonGroup.Libraries : AddonGroup.Addons;
+
+    /// <summary>Sort key that keeps the items of a group together (addons first).</summary>
+    public int GroupOrder => Group.Order;
+
     /// <summary>"v2.3 · Updated 03.11.2026 · 1.2M downloads"</summary>
     public string Details
     {
@@ -254,6 +260,8 @@ public sealed partial class AddonItemViewModel : ViewModelBase
         OnPropertyChanged(nameof(Downloads));
         OnPropertyChanged(nameof(Updated));
         OnPropertyChanged(nameof(IsLibrary));
+        OnPropertyChanged(nameof(Group));
+        OnPropertyChanged(nameof(GroupOrder));
         OnPropertyChanged(nameof(Details));
         OnPropertyChanged(nameof(IconUrl));
         OnPropertyChanged(nameof(Icon));

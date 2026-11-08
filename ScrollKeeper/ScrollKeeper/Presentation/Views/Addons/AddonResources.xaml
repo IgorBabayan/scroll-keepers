@@ -102,6 +102,50 @@
         </StackPanel>
     </DataTemplate>
 
+    <!--
+        Collapsible group of a grouped addon list (Installed: Addons / Libraries).
+        The group's Name is an AddonGroup, which keeps IsExpanded across rescans and searches.
+    -->
+    <GroupStyle x:Key="AddonGroupStyle" HidesIfEmpty="True">
+        <GroupStyle.ContainerStyle>
+            <Style TargetType="GroupItem">
+                <Setter Property="Focusable" Value="False" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="GroupItem">
+                            <StackPanel>
+                                <ToggleButton Margin="0,4,0,2"
+                                              Style="{StaticResource GroupHeaderToggleButtonStyle}"
+                                              IsChecked="{Binding Name.IsExpanded, Mode=TwoWay}"
+                                              AutomationProperties.Name="{Binding Name.Title}"
+                                              ToolTip="Show or hide this group">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock VerticalAlignment="Center"
+                                                   FontSize="13"
+                                                   FontWeight="SemiBold"
+                                                   Text="{Binding Name.Title}" />
+                                        <Border Margin="8,0,0,0"
+                                                Padding="6,0"
+                                                MinWidth="18"
+                                                CornerRadius="9"
+                                                VerticalAlignment="Center"
+                                                Background="{DynamicResource ControlBackgroundBrush}">
+                                            <TextBlock HorizontalAlignment="Center"
+                                                       FontSize="11"
+                                                       Foreground="{DynamicResource SecondaryForegroundBrush}"
+                                                       Text="{Binding ItemCount}" />
+                                        </Border>
+                                    </StackPanel>
+                                </ToggleButton>
+                                <ItemsPresenter Visibility="{Binding Name.IsExpanded, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                            </StackPanel>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+        </GroupStyle.ContainerStyle>
+    </GroupStyle>
+
     <!-- One addon row; the whole row opens the addon page. -->
     <DataTemplate x:Key="AddonRowTemplate" DataType="{x:Type addons:AddonItemViewModel}">
         <Button Style="{StaticResource ListRowButtonStyle}"

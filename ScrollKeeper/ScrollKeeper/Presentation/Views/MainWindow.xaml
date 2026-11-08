@@ -188,9 +188,14 @@
                         <ListBox Grid.Row="1"
                                  Margin="-12,0"
                                  Style="{StaticResource AddonListBoxStyle}"
+                                 VirtualizingPanel.IsVirtualizingWhenGrouping="True"
                                  ItemsSource="{Binding InstalledView}"
                                  ItemTemplate="{StaticResource AddonRowTemplate}"
-                                 AutomationProperties.Name="Installed addons" />
+                                 AutomationProperties.Name="Installed addons">
+                            <ListBox.GroupStyle>
+                                <StaticResource ResourceKey="AddonGroupStyle" />
+                            </ListBox.GroupStyle>
+                        </ListBox>
 
                         <!-- AddOns folder not found -->
                         <StackPanel Grid.Row="1"
