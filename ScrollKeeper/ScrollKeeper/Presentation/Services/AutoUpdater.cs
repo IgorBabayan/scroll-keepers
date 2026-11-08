@@ -4,6 +4,7 @@ using System.IO;
 using System.Net.Http;
 using System.Text.Json;
 using System.Windows;
+using ScrollKeeper.Presentation.Services.Notifications;
 using ScrollKeeper.Presentation.Services.Toasts;
 using ScrollKeeper.Services.Settings;
 using ScrollKeeper.Services.Updates;
@@ -13,9 +14,13 @@ namespace ScrollKeeper.Presentation.Services;
 public sealed partial class AutoUpdater(
     ISettingsService settingsService,
     IUpdateService updateService,
-    IToastService toastService) : ObservableObject, IAutoUpdater
+    IToastService toastService,
+    INotificationCenter notifications) : ObservableObject, IAutoUpdater
 {
     private static readonly TimeSpan CheckTimeout = TimeSpan.FromSeconds(15);
+
+    /// <summary>Action center key of the "new version available" notification.</summary>
+    private const string AppUpdateKey = "app-update";
 
     [ObservableProperty]
     private bool _isBusy;
@@ -131,6 +136,8 @@ public sealed partial class AutoUpdater(
             // Network problem, bad download or the UAC prompt was declined: keep running the current version.
             Debug.WriteLine($"Update failed: {ex}");
             toastService.Show("Update failed", ToastSeverity.Error).Details = Describe(ex);
+            notifications.Add("ScrollKeeper update failed", ToastSeverity.Error, Describe(ex))
+                .SetAction("Try again", () => _ = DownloadAndInstallAsync());
         }
         finally
         {
@@ -179,7 +186,46 @@ public sealed partial class AutoUpdater(
         using var timeout = new CancellationTokenSource(CheckTimeout);
         var update = await updateService.CheckForUpdateAsync(timeout.Token);
         AvailableUpdate = update;
+        UpdateNotification(update);
         return update;
+    }
+
+    /// <summary>Keeps "A new version is available" in the action center while an update is pending.</summary>
+    private void UpdateNotification(UpdateInfo? update)
+    {
+        if (update is null)
+        {
+            notifications.Remove(AppUpdateKey);
+            return;
+        }
+
+        var version = update.Version.ToString(3);
+        if (CanInstall)
+        {
+            notifications.Set(AppUpdateKey, $"ScrollKeeper {version} is available", ToastSeverity.Info,
+                "Download it now; the application restarts into the new version.",
+                "Download and update", () => _ = DownloadAndInstallAsync());
+        }
+        else
+        {
+            // Not an installed copy (e.g. run from the build folder): the update cannot be installed in place.
+            notifications.Set(AppUpdateKey, $"ScrollKeeper {version} is available", ToastSeverity.Info,
+                "Install it with the installer from the release page.",
+                "Open release page",
+                update.ReleasePageUrl is { } page ? () => OpenUrl(page) : null);
+        }
+    }
+
+    private static void OpenUrl(Uri url)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo(url.AbsoluteUri) { UseShellExecute = true });
+        }
+        catch (Exception ex) when (ex is Win32Exception or InvalidOperationException)
+        {
+            Debug.WriteLine($"Could not open {url}: {ex.Message}");
+        }
     }
 
     private static string RestartMessage(int seconds) =>

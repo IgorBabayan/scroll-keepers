@@ -6,6 +6,7 @@ using System.Net.Http;
 using System.Windows.Data;
 using System.Windows.Threading;
 using ScrollKeeper.Presentation.Services;
+using ScrollKeeper.Presentation.Services.Notifications;
 using ScrollKeeper.Presentation.Services.Toasts;
 using ScrollKeeper.Presentation.ViewModels.Addons;
 using ScrollKeeper.Services.Addons;
@@ -23,6 +24,14 @@ public sealed partial class MainViewModel : ViewModelBase, IAddonActions
 {
     private static readonly TimeSpan SearchDelay = TimeSpan.FromMilliseconds(200);
 
+    // Action center keys: one notification per state.
+    private const string AddonUpdatesKey = "addon-updates";
+    private const string AddonsFolderKey = "addons-folder";
+    private const string CatalogKey = "catalog";
+
+    /// <summary>Addon names listed in the "updates available" notification before "and N more".</summary>
+    private const int MaxListedUpdates = 5;
+
     private readonly ISettingsService _settings;
     private readonly IAddonCatalog _catalog;
     private readonly ILocalAddonScanner _scanner;
@@ -32,9 +41,12 @@ public sealed partial class MainViewModel : ViewModelBase, IAddonActions
     private readonly IAddonUninstaller _uninstaller;
     private readonly IImageCache _images;
     private readonly IToastService _toasts;
+    private readonly INotificationCenter _notifications;
     private readonly IWindowService _windows;
 
     private readonly Dictionary<string, AddonItemViewModel> _items = new(StringComparer.Ordinal);
+    /// <summary>Addons listed in the last "updates available" notification.</summary>
+    private HashSet<string> _notifiedUpdates = new(StringComparer.Ordinal);
     private readonly ObservableCollection<AddonItemViewModel> _installed = [];
     /// <summary>Replaced as a whole when the catalog loads (see <see cref="ApplyCatalog"/>).</summary>
     private List<AddonItemViewModel> _browse = [];
@@ -58,7 +70,9 @@ public sealed partial class MainViewModel : ViewModelBase, IAddonActions
         IAddonUninstaller uninstaller,
         IImageCache images,
         IToastService toasts,
-        IWindowService windows)
+        INotificationCenter notifications,
+        IWindowService windows,
+        ActionCenterViewModel actionCenter)
     {
         _settings = settings;
         _catalog = catalog;
@@ -69,7 +83,9 @@ public sealed partial class MainViewModel : ViewModelBase, IAddonActions
         _uninstaller = uninstaller;
         _images = images;
         _toasts = toasts;
+        _notifications = notifications;
         _windows = windows;
+        ActionCenter = actionCenter;
 
         // Installed: grouped into addons and libraries (in that order, groups follow the first sort key);
         // inside a group, addons with updates first, then by name. Live sorting and grouping move a row once it
@@ -104,6 +120,9 @@ public sealed partial class MainViewModel : ViewModelBase, IAddonActions
 
         _settings.SettingsChanged += OnSettingsChanged;
     }
+
+    /// <summary>The bell in the title bar.</summary>
+    public ActionCenterViewModel ActionCenter { get; }
 
     public ICollectionView InstalledView { get; }
 
@@ -241,6 +260,8 @@ public sealed partial class MainViewModel : ViewModelBase, IAddonActions
             {
                 Debug.WriteLine($"Install of {addon.Name} failed: {ex}");
                 _toasts.Show($"Could not install {item.Name}", ToastSeverity.Error).Details = Describe(ex);
+                _notifications.Add($"Could not install {item.Name}", ToastSeverity.Error, Describe(ex))
+                    .SetAction("Try again", () => _ = InstallAsync(item));
                 return;
             }
 
@@ -260,7 +281,9 @@ public sealed partial class MainViewModel : ViewModelBase, IAddonActions
                     lines.Add($"Not found on ESOUI: {string.Join(", ", dependencies.Unavailable)}");
                 if (dependencies.Failed.Count > 0)
                     lines.Add($"Could not install: {string.Join("; ", dependencies.Failed)}");
-                _toasts.Show($"{item.Name} is missing dependencies", ToastSeverity.Warning).Details = string.Join("\n", lines);
+                var text = string.Join("\n", lines);
+                _toasts.Show($"{item.Name} is missing dependencies", ToastSeverity.Warning).Details = text;
+                _notifications.Add($"{item.Name} is missing dependencies", ToastSeverity.Warning, text);
             }
         }
         catch (Exception ex) when (IsInstallError(ex))
@@ -318,8 +341,10 @@ public sealed partial class MainViewModel : ViewModelBase, IAddonActions
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             Debug.WriteLine($"Removal of {name} failed: {ex}");
-            _toasts.Show($"Could not remove {name}", ToastSeverity.Error).Details =
-                $"{ex.Message} {LockedFolderHint(folder)}";
+            var text = $"{ex.Message} {LockedFolderHint(folder)}";
+            _toasts.Show($"Could not remove {name}", ToastSeverity.Error).Details = text;
+            _notifications.Add($"Could not remove {name}", ToastSeverity.Error, text)
+                .SetAction("Try again", () => _ = RemoveAsync(item));
             item.EndInstall();
             // Part of it may be gone already.
             await RefreshInstalledAsync();
@@ -427,12 +452,21 @@ public sealed partial class MainViewModel : ViewModelBase, IAddonActions
             await RefreshInstalledAsync();
 
             if (snapshot.IsFromCache)
-                _toasts.Show("ESOUI is not reachable", ToastSeverity.Warning).Details = "Showing the addon list from your last visit.";
+            {
+                const string details = "Showing the addon list from your last visit.";
+                _toasts.Show("ESOUI is not reachable", ToastSeverity.Warning).Details = details;
+                _notifications.Set(CatalogKey, "ESOUI is not reachable", ToastSeverity.Warning, details, "Try again", Retry);
+            }
+            else
+            {
+                _notifications.Remove(CatalogKey);
+            }
         }
         catch (Exception ex) when (EsoUiCatalog.IsNetworkError(ex) || ex is InvalidDataException)
         {
             Debug.WriteLine($"Catalog failed: {ex}");
             CatalogError = $"Could not load the addon list from ESOUI. {Describe(ex)}";
+            _notifications.Set(CatalogKey, "Could not load the addon list", ToastSeverity.Error, Describe(ex), "Try again", Retry);
         }
         finally
         {
@@ -506,11 +540,54 @@ public sealed partial class MainViewModel : ViewModelBase, IAddonActions
             OnPropertyChanged(nameof(InstalledHeader));
             OnPropertyChanged(nameof(IsInstalledEmpty));
             OnPropertyChanged(nameof(IsAddonsFolderMissing));
+
+            UpdateStateNotifications();
         }
         finally
         {
             _refreshLock.Release();
         }
+    }
+
+    /// <summary>Keeps the action center in step with the Installed tab: available updates and the AddOns folder.</summary>
+    private void UpdateStateNotifications()
+    {
+        var updates = _installed
+            .Where(i => i.HasUpdate && i.CanInstall)
+            .OrderBy(i => i.Name, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+
+        if (updates.Count > 0)
+        {
+            var details = string.Join(", ", updates.Take(MaxListedUpdates).Select(i => i.Name));
+            if (updates.Count > MaxListedUpdates)
+                details += $" and {updates.Count - MaxListedUpdates} more";
+
+            // Only new updates are news; fewer left (e.g. while "Update all" runs) just updates the text.
+            var keys = updates.Select(i => i.Key).ToHashSet(StringComparer.Ordinal);
+            var isNews = !keys.IsSubsetOf(_notifiedUpdates);
+            _notifiedUpdates = keys;
+
+            _notifications.Set(AddonUpdatesKey, UpdatesText, ToastSeverity.Info, details, "Update all",
+                () => UpdateAllCommand.Execute(null), isNews);
+        }
+        else
+        {
+            _notifiedUpdates.Clear();
+            _notifications.Remove(AddonUpdatesKey);
+        }
+
+        if (IsAddonsFolderMissing)
+            _notifications.Set(AddonsFolderKey, "AddOns folder not found", ToastSeverity.Error,
+                $"Nothing was found at {AddonsFolder}.", "Open Settings", OpenSettings);
+        else
+            _notifications.Remove(AddonsFolderKey);
+    }
+
+    private void Retry()
+    {
+        if (RefreshCommand.CanExecute(null))
+            RefreshCommand.Execute(null);
     }
 
     private AddonItemViewModel GetOrCreateItem(string key)

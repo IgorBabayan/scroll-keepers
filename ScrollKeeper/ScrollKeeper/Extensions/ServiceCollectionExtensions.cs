@@ -1,5 +1,6 @@
 using System.Net.Http;
 using ScrollKeeper.Presentation.Services;
+using ScrollKeeper.Presentation.Services.Notifications;
 using ScrollKeeper.Presentation.Services.Toasts;
 using ScrollKeeper.Presentation.ViewModels.Settings;
 using ScrollKeeper.Presentation.ViewModels.Shell;
@@ -50,9 +51,11 @@ static class ServiceCollectionExtensions
             services.AddSingleton<IWindowService, WindowService>();
             services.AddSingleton<IFolderPickerService, FolderPickerService>();
             services.AddSingleton<IToastService, ToastService>();
+            services.AddSingleton<INotificationCenter, NotificationCenter>();
             services.AddSingleton<IAutoUpdater, AutoUpdater>();
 
             // Shell
+            services.AddSingleton<ActionCenterViewModel>();
             services.AddSingleton<MainViewModel>();
             services.AddSingleton<MainWindow>();
 

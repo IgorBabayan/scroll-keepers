@@ -3,7 +3,7 @@ using System.Collections.ObjectModel;
 namespace ScrollKeeper.Presentation.Services.Toasts;
 
 /// <summary>
-/// Shows toast messages. Toasts are transient: they are not stored in the notification center.
+/// Shows toast messages. Toasts are transient: what still needs attention goes to the action center (INotificationCenter).
 /// Must be used from the UI thread.
 /// </summary>
 public interface IToastService

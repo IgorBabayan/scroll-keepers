@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using ScrollKeeper.Presentation.ViewModels.Shell;
@@ -24,7 +25,28 @@ public partial class MainWindow : Window
         // Resource references (not brush instances) so the title follows runtime theme changes.
         Activated += (_, _) => TitleText.SetResourceReference(TextBlock.ForegroundProperty, "WindowForegroundBrush");
         Deactivated += (_, _) => TitleText.SetResourceReference(TextBlock.ForegroundProperty, "TitleBarInactiveForegroundBrush");
+
+        ActionCenterPopup.CustomPopupPlacementCallback = PlaceActionCenter;
     }
+
+    #region Action center
+
+    /// <summary>Shadow margin around the flyout content (see ActionCenterView.xaml).</summary>
+    private const double ActionCenterShadowMargin = 12;
+
+    /// <summary>
+    /// Opens the flyout right under the title bar, its right edge aligned with the bell button
+    /// (sizes and offsets are in device pixels).
+    /// </summary>
+    private CustomPopupPlacement[] PlaceActionCenter(Size popupSize, Size targetSize, Point offset)
+    {
+        var dpi = VisualTreeHelper.GetDpi(this);
+        var shadow = ActionCenterShadowMargin * dpi.DpiScaleX;
+        var point = new Point(targetSize.Width - popupSize.Width + shadow, targetSize.Height);
+        return [new CustomPopupPlacement(point, PopupPrimaryAxis.Horizontal)];
+    }
+
+    #endregion
 
     #region Caption buttons
 

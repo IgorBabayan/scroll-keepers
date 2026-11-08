@@ -6,6 +6,7 @@
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         xmlns:shellVm="clr-namespace:ScrollKeeper.Presentation.ViewModels.Shell"
         xmlns:toastViews="clr-namespace:ScrollKeeper.Presentation.Views.Toasts"
+        xmlns:shellViews="clr-namespace:ScrollKeeper.Presentation.Views.Shell"
         mc:Ignorable="d"
         d:DataContext="{d:DesignInstance Type=shellVm:MainViewModel, IsDesignTimeCreatable=False}"
         Title="ScrollKeeper"
@@ -21,7 +22,7 @@
     <!--
         WindowChrome removes the native title bar but keeps native behaviour, like any Windows window:
         drag to move, double-click to maximize, Alt+Space menu, Aero snap and resizing from the edges.
-        Settings / Minimize / Maximize / Close are drawn in the title bar (see Themes/WindowChrome.xaml).
+        Notifications / Settings / Minimize / Maximize / Close are drawn in the title bar (see Themes/WindowChrome.xaml).
     -->
     <shell:WindowChrome.WindowChrome>
         <shell:WindowChrome CaptionHeight="32"
@@ -41,6 +42,7 @@
     <Window.InputBindings>
         <KeyBinding Gesture="F5" Command="{Binding RefreshCommand}" />
         <KeyBinding Gesture="Ctrl+OemComma" Command="{Binding OpenSettingsCommand}" />
+        <KeyBinding Gesture="Ctrl+Shift+N" Command="{Binding ActionCenter.ToggleCommand}" />
     </Window.InputBindings>
 
     <Border x:Name="RootBorder"
@@ -77,6 +79,47 @@
 
                 <!-- Custom buttons placed before the standard caption buttons -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal">
+                    <!--
+                        Action center. While the flyout is open the button ignores the mouse: the click that closes the
+                        (StaysOpen=False) popup must not reopen it right away.
+                    -->
+                    <ToggleButton x:Name="ActionCenterButton"
+                                  Style="{StaticResource TitleBarToolToggleButtonStyle}"
+                                  ToolTip="Notifications (Ctrl+Shift+N)"
+                                  AutomationProperties.Name="Notifications"
+                                  IsChecked="{Binding ActionCenter.IsOpen, Mode=TwoWay}"
+                                  IsHitTestVisible="{Binding ActionCenter.IsOpen, Converter={StaticResource InverseBooleanConverter}}">
+                        <Grid>
+                            <TextBlock Text="&#xE91C;" />
+                            <!-- Unread count -->
+                            <Border MinWidth="14"
+                                    Height="14"
+                                    Margin="0,-7,-10,0"
+                                    Padding="3,0"
+                                    HorizontalAlignment="Right"
+                                    VerticalAlignment="Top"
+                                    CornerRadius="7"
+                                    Background="{DynamicResource AccentBrush}"
+                                    Visibility="{Binding ActionCenter.Center.HasUnread, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <TextBlock HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           FontFamily="{StaticResource BodyFont}"
+                                           FontSize="9"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource AccentForegroundBrush}"
+                                           Text="{Binding ActionCenter.Center.UnreadCount}" />
+                            </Border>
+                        </Grid>
+                    </ToggleButton>
+                    <Popup x:Name="ActionCenterPopup"
+                           PlacementTarget="{Binding ElementName=ActionCenterButton}"
+                           Placement="Custom"
+                           StaysOpen="False"
+                           AllowsTransparency="True"
+                           PopupAnimation="Fade"
+                           IsOpen="{Binding ActionCenter.IsOpen, Mode=TwoWay}">
+                        <shellViews:ActionCenterView DataContext="{Binding ActionCenter}" />
+                    </Popup>
                     <Button x:Name="SettingsButton"
                             Style="{StaticResource TitleBarToolButtonStyle}"
                             ToolTip="Settings (Ctrl+,)"
