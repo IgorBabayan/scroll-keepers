@@ -29,6 +29,7 @@ public sealed partial class MainViewModel : ViewModelBase, IAddonActions
     private readonly IInstallRecordStore _records;
     private readonly IAddonInstaller _installer;
     private readonly IDependencyResolver _dependencies;
+    private readonly IAddonUninstaller _uninstaller;
     private readonly IImageCache _images;
     private readonly IToastService _toasts;
     private readonly IWindowService _windows;
@@ -54,6 +55,7 @@ public sealed partial class MainViewModel : ViewModelBase, IAddonActions
         IInstallRecordStore records,
         IAddonInstaller installer,
         IDependencyResolver dependencies,
+        IAddonUninstaller uninstaller,
         IImageCache images,
         IToastService toasts,
         IWindowService windows)
@@ -64,6 +66,7 @@ public sealed partial class MainViewModel : ViewModelBase, IAddonActions
         _records = records;
         _installer = installer;
         _dependencies = dependencies;
+        _uninstaller = uninstaller;
         _images = images;
         _toasts = toasts;
         _windows = windows;
@@ -266,6 +269,61 @@ public sealed partial class MainViewModel : ViewModelBase, IAddonActions
         }
     }
 
+    public async Task RemoveAsync(AddonItemViewModel item)
+    {
+        if (item.Installed is not { } installed || item.IsBusy)
+            return;
+
+        var folder = _settings.AddonsFolder;
+        RemovalPlan plan;
+        try
+        {
+            plan = await Task.Run(() => _uninstaller.Plan(folder, installed));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _toasts.Show("Could not read the AddOns folder", ToastSeverity.Error).Details = ex.Message;
+            return;
+        }
+
+        // The addon may have started installing while the folder was read.
+        if (item.IsBusy || !_windows.ConfirmRemoval(item.Name, plan))
+            return;
+
+        var name = item.Name;
+        item.BeginInstall();
+        item.ReportStatus("Removing…");
+        try
+        {
+            await Task.Run(() => _uninstaller.Remove(folder, plan));
+            item.EndInstall();
+            await RefreshInstalledAsync();
+
+            var details = new List<string>(2);
+            if (plan.UnusedDependencies.Count > 0)
+                details.Add($"Also removed: {string.Join(", ", plan.UnusedDependencies)}");
+            if (plan.SavedVariablesFiles.Count > 0)
+                details.Add("Saved settings deleted.");
+            var toast = _toasts.Show($"{name} removed", ToastSeverity.Success);
+            if (details.Count > 0)
+                toast.Details = string.Join("\n", details);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Debug.WriteLine($"Removal of {name} failed: {ex}");
+            _toasts.Show($"Could not remove {name}", ToastSeverity.Error).Details =
+                $"{ex.Message} Close the game and try again.";
+            item.EndInstall();
+            // Part of it may be gone already.
+            await RefreshInstalledAsync();
+        }
+        finally
+        {
+            if (item.IsBusy)
+                item.EndInstall();
+        }
+    }
+
     public void OpenDetails(AddonItemViewModel item) => _windows.ShowAddonDetails(item);
 
     // ===== Dependencies =====
@@ -329,7 +387,7 @@ public sealed partial class MainViewModel : ViewModelBase, IAddonActions
                 try
                 {
                     var progress = new Progress<InstallProgress>(item.ReportProgress);
-                    var dependencyRecord = await _installer.InstallAsync(source, folder, progress);
+                    var dependencyRecord = await _installer.InstallAsync(source, folder, progress, asDependency: true);
                     installed.Add(source.Name);
                     pending.Enqueue(dependencyRecord.Directories);
                 }

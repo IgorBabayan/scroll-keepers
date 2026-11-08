@@ -29,63 +29,77 @@
     </DataTemplate>
 
     <!--
-        Install / Update button, "Installed" label or the progress of a running install:
+        Remove button, then the Install / Update button, "Installed" label or the progress of a running install:
         the button hides itself while the addon downloads and installs, and the progress bar takes its place.
     -->
     <DataTemplate x:Key="AddonActionTemplate" DataType="{x:Type addons:AddonItemViewModel}">
-        <Grid MinWidth="150" VerticalAlignment="Center">
-            <Button HorizontalAlignment="Right"
-                    Style="{StaticResource CompactAccentButtonStyle}"
-                    Content="Install"
-                    ToolTip="Download and install this addon"
-                    AutomationProperties.Name="{Binding Name, StringFormat='Install {0}'}"
-                    Command="{Binding InstallCommand}"
-                    Visibility="{Binding ShowInstallButton, Converter={StaticResource BooleanToVisibilityConverter}}" />
-
-            <Button HorizontalAlignment="Right"
-                    Style="{StaticResource CompactAccentButtonStyle}"
-                    Content="Update"
-                    AutomationProperties.Name="{Binding Name, StringFormat='Update {0}'}"
-                    Command="{Binding InstallCommand}"
-                    Visibility="{Binding ShowUpdateButton, Converter={StaticResource BooleanToVisibilityConverter}}">
-                <Button.ToolTip>
-                    <TextBlock>
-                        <Run Text="Update to" />
-                        <Run Text="{Binding LatestVersion, Mode=OneWay}" />
-                    </TextBlock>
-                </Button.ToolTip>
+        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+            <!-- Remove: the addon, its settings and the libraries nothing else uses (asks first). -->
+            <Button Width="28"
+                    Height="28"
+                    Margin="0,0,8,0"
+                    VerticalAlignment="Center"
+                    Style="{StaticResource SubtleIconButtonStyle}"
+                    ToolTip="Remove this addon, its settings and unused libraries"
+                    AutomationProperties.Name="{Binding Name, StringFormat='Remove {0}'}"
+                    Command="{Binding RemoveCommand}"
+                    Visibility="{Binding ShowRemoveButton, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <TextBlock FontFamily="{StaticResource IconFont}" FontSize="13" Text="&#xE74D;" />
             </Button>
+            <Grid MinWidth="150" VerticalAlignment="Center">
+                <Button HorizontalAlignment="Right"
+                        Style="{StaticResource CompactAccentButtonStyle}"
+                        Content="Install"
+                        ToolTip="Download and install this addon"
+                        AutomationProperties.Name="{Binding Name, StringFormat='Install {0}'}"
+                        Command="{Binding InstallCommand}"
+                        Visibility="{Binding ShowInstallButton, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
-            <StackPanel HorizontalAlignment="Right"
-                        Orientation="Horizontal"
-                        Visibility="{Binding ShowInstalledLabel, Converter={StaticResource BooleanToVisibilityConverter}}">
-                <TextBlock VerticalAlignment="Center"
-                           FontFamily="{StaticResource IconFont}"
-                           FontSize="12"
-                           Foreground="{DynamicResource SuccessForegroundBrush}"
-                           Text="&#xE73E;" />
-                <TextBlock Margin="6,0,4,0"
-                           VerticalAlignment="Center"
-                           FontSize="12"
-                           Foreground="{DynamicResource SecondaryForegroundBrush}"
-                           Text="Installed" />
-            </StackPanel>
+                <Button HorizontalAlignment="Right"
+                        Style="{StaticResource CompactAccentButtonStyle}"
+                        Content="Update"
+                        AutomationProperties.Name="{Binding Name, StringFormat='Update {0}'}"
+                        Command="{Binding InstallCommand}"
+                        Visibility="{Binding ShowUpdateButton, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Button.ToolTip>
+                        <TextBlock>
+                            <Run Text="Update to" />
+                            <Run Text="{Binding LatestVersion, Mode=OneWay}" />
+                        </TextBlock>
+                    </Button.ToolTip>
+                </Button>
 
-            <StackPanel Width="150"
-                        HorizontalAlignment="Right"
-                        Visibility="{Binding IsBusy, Converter={StaticResource BooleanToVisibilityConverter}}">
-                <ProgressBar Minimum="0"
-                             Maximum="100"
-                             Value="{Binding Progress, Mode=OneWay}"
-                             IsIndeterminate="{Binding IsProgressIndeterminate, Mode=OneWay}"
-                             AutomationProperties.Name="{Binding ProgressText}" />
-                <TextBlock Margin="0,4,0,0"
-                           FontSize="11"
-                           TextTrimming="CharacterEllipsis"
-                           Foreground="{DynamicResource SecondaryForegroundBrush}"
-                           Text="{Binding ProgressText}" />
-            </StackPanel>
-        </Grid>
+                <StackPanel HorizontalAlignment="Right"
+                            Orientation="Horizontal"
+                            Visibility="{Binding ShowInstalledLabel, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <TextBlock VerticalAlignment="Center"
+                               FontFamily="{StaticResource IconFont}"
+                               FontSize="12"
+                               Foreground="{DynamicResource SuccessForegroundBrush}"
+                               Text="&#xE73E;" />
+                    <TextBlock Margin="6,0,4,0"
+                               VerticalAlignment="Center"
+                               FontSize="12"
+                               Foreground="{DynamicResource SecondaryForegroundBrush}"
+                               Text="Installed" />
+                </StackPanel>
+
+                <StackPanel Width="150"
+                            HorizontalAlignment="Right"
+                            Visibility="{Binding IsBusy, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <ProgressBar Minimum="0"
+                                 Maximum="100"
+                                 Value="{Binding Progress, Mode=OneWay}"
+                                 IsIndeterminate="{Binding IsProgressIndeterminate, Mode=OneWay}"
+                                 AutomationProperties.Name="{Binding ProgressText}" />
+                    <TextBlock Margin="0,4,0,0"
+                               FontSize="11"
+                               TextTrimming="CharacterEllipsis"
+                               Foreground="{DynamicResource SecondaryForegroundBrush}"
+                               Text="{Binding ProgressText}" />
+                </StackPanel>
+            </Grid>
+        </StackPanel>
     </DataTemplate>
 
     <!-- One addon row; the whole row opens the addon page. -->

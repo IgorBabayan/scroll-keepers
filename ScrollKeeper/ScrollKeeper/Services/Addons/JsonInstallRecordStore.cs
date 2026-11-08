@@ -63,12 +63,47 @@ public sealed class JsonInstallRecordStore : IInstallRecordStore
             }
 
             records[record.AddonId] = record;
-
-            Directory.CreateDirectory(Path.GetDirectoryName(_filePath)!);
-            var temp = _filePath + ".tmp";
-            File.WriteAllText(temp, JsonSerializer.Serialize(data, SerializerOptions));
-            File.Move(temp, _filePath, overwrite: true);
+            Write(data);
         }
+    }
+
+    public void RemoveDirectories(string addonsFolder, IReadOnlyCollection<string> directories, string? removedAddonId = null)
+    {
+        ArgumentNullException.ThrowIfNull(directories);
+
+        lock (_lock)
+        {
+            var data = Load();
+            if (!data.TryGetValue(Key(addonsFolder), out var records))
+                return;
+
+            var changed = removedAddonId is not null && records.Remove(removedAddonId);
+            foreach (var (id, record) in records.ToList())
+            {
+                var remaining = record.Directories
+                    .Where(d => !directories.Contains(d, StringComparer.OrdinalIgnoreCase))
+                    .ToList();
+                if (remaining.Count == record.Directories.Count)
+                    continue;
+
+                changed = true;
+                if (remaining.Count == 0)
+                    records.Remove(id);
+                else
+                    records[id] = record with { Directories = remaining };
+            }
+
+            if (changed)
+                Write(data);
+        }
+    }
+
+    private void Write(Dictionary<string, Dictionary<string, InstallRecord>> data)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(_filePath)!);
+        var temp = _filePath + ".tmp";
+        File.WriteAllText(temp, JsonSerializer.Serialize(data, SerializerOptions));
+        File.Move(temp, _filePath, overwrite: true);
     }
 
     private Dictionary<string, Dictionary<string, InstallRecord>> Load()

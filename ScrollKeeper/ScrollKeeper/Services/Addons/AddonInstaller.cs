@@ -15,6 +15,7 @@ public sealed class AddonInstaller(IAddonCatalog catalog, HttpClient http, IInst
         CatalogAddon addon,
         string addonsFolder,
         IProgress<InstallProgress>? progress,
+        bool asDependency = false,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(addon);
@@ -55,7 +56,9 @@ public sealed class AddonInstaller(IAddonCatalog catalog, HttpClient http, IInst
             progress?.Report(new InstallProgress(InstallStage.Installing, 1));
 
             var version = string.IsNullOrWhiteSpace(details.Version) ? addon.Version : details.Version;
-            var record = new InstallRecord(addon.Id, version, directories, DateTimeOffset.UtcNow);
+            var previous = records.GetAll(addonsFolder).GetValueOrDefault(addon.Id);
+            var isDependency = previous?.IsDependency ?? asDependency;
+            var record = new InstallRecord(addon.Id, version, directories, DateTimeOffset.UtcNow, isDependency);
             records.Save(addonsFolder, record);
             return record;
         }
@@ -206,7 +209,7 @@ public sealed class AddonInstaller(IAddonCatalog catalog, HttpClient http, IInst
     }
 
     /// <summary>Deletes a folder, including read-only files (some archives carry that attribute).</summary>
-    private static void DeleteDirectory(string path)
+    internal static void DeleteDirectory(string path)
     {
         foreach (var file in Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories))
         {

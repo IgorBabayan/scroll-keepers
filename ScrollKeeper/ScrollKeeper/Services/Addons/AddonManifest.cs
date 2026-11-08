@@ -39,16 +39,25 @@ public sealed partial record AddonManifest(
             var key = line[2..separator].Trim();
             var value = line[(separator + 1)..].Trim();
 
-            // Unlike other headers, the game reads every DependsOn line, not only the first.
-            if (key.Equals("DependsOn", StringComparison.OrdinalIgnoreCase))
+            // Unlike other headers, the game reads every dependency line, not only the first.
+            // PC* lines apply to the PC client (ScrollKeeper's platform), Console* lines only to consoles.
+            if (key.Equals("DependsOn", StringComparison.OrdinalIgnoreCase)
+                || key.Equals("PCDependsOn", StringComparison.OrdinalIgnoreCase))
             {
                 AddonDependency.ParseList(value, dependsOn);
                 continue;
             }
 
-            if (key.Equals("OptionalDependsOn", StringComparison.OrdinalIgnoreCase))
+            if (key.Equals("OptionalDependsOn", StringComparison.OrdinalIgnoreCase)
+                || key.Equals("PCOptionalDependsOn", StringComparison.OrdinalIgnoreCase))
             {
                 AddonDependency.ParseList(value, optionalDependsOn);
+                continue;
+            }
+
+            if (key.StartsWith("Console", StringComparison.OrdinalIgnoreCase)
+                && key.EndsWith("DependsOn", StringComparison.OrdinalIgnoreCase))
+            {
                 continue;
             }
 

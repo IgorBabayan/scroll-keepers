@@ -137,8 +137,8 @@ public sealed partial class AddonItemViewModel : ViewModelBase
     public bool CanInstall => Catalog is not null;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowInstallButton), nameof(ShowUpdateButton), nameof(ShowInstalledLabel))]
-    [NotifyCanExecuteChangedFor(nameof(InstallCommand))]
+    [NotifyPropertyChangedFor(nameof(ShowInstallButton), nameof(ShowUpdateButton), nameof(ShowInstalledLabel), nameof(ShowRemoveButton))]
+    [NotifyCanExecuteChangedFor(nameof(InstallCommand), nameof(RemoveCommand))]
     private bool _isBusy;
 
     /// <summary>0..100 of the current stage (download, then installation).</summary>
@@ -160,11 +160,19 @@ public sealed partial class AddonItemViewModel : ViewModelBase
     /// <summary>Installed and up to date.</summary>
     public bool ShowInstalledLabel => IsInstalled && !HasUpdate && !IsBusy;
 
+    /// <summary>Installed and idle: the addon can be removed.</summary>
+    public bool ShowRemoveButton => IsInstalled && !IsBusy;
+
     /// <summary>Install and Update are the same operation: the archive replaces the addon's folders.</summary>
     [RelayCommand(CanExecute = nameof(CanRunInstall))]
     private Task InstallAsync() => _actions.InstallAsync(this);
 
     private bool CanRunInstall() => CanInstall && !IsBusy;
+
+    [RelayCommand(CanExecute = nameof(CanRunRemove))]
+    private Task RemoveAsync() => _actions.RemoveAsync(this);
+
+    private bool CanRunRemove() => IsInstalled && !IsBusy;
 
     [RelayCommand]
     private void OpenDetails() => _actions.OpenDetails(this);
@@ -255,7 +263,9 @@ public sealed partial class AddonItemViewModel : ViewModelBase
         OnPropertyChanged(nameof(ShowInstallButton));
         OnPropertyChanged(nameof(ShowUpdateButton));
         OnPropertyChanged(nameof(ShowInstalledLabel));
+        OnPropertyChanged(nameof(ShowRemoveButton));
         InstallCommand.NotifyCanExecuteChanged();
+        RemoveCommand.NotifyCanExecuteChanged();
     }
 
     private static string FormatVersion(string version) =>

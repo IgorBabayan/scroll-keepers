@@ -2,6 +2,7 @@ using System.Windows;
 using ScrollKeeper.Presentation.ViewModels.Addons;
 using ScrollKeeper.Presentation.Views.Addons;
 using ScrollKeeper.Presentation.Views.Settings;
+using ScrollKeeper.Services.Addons;
 
 namespace ScrollKeeper.Presentation.Services;
 
@@ -29,6 +30,12 @@ public sealed class WindowService(IServiceProvider services) : IWindowService
 
         var viewModel = ActivatorUtilities.CreateInstance<ImageViewerViewModel>(services, title, pictures, index);
         ShowModal(new ImageViewerWindow(viewModel));
+    }
+
+    public bool ConfirmRemoval(string addonName, RemovalPlan plan)
+    {
+        ArgumentNullException.ThrowIfNull(plan);
+        return ShowModal(new ConfirmRemoveWindow(addonName, plan));
     }
 
     private static bool ShowModal(Window window)

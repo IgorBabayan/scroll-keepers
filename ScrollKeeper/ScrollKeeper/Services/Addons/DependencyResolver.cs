@@ -83,7 +83,7 @@ public sealed class DependencyResolver : IDependencyResolver
         return available;
     }
 
-    private static void CollectManifests(string path, int depth, List<(string Folder, AddonManifest Manifest)> target)
+    internal static void CollectManifests(string path, int depth, List<(string Folder, AddonManifest Manifest)> target)
     {
         var name = Path.GetFileName(path);
         if (name.StartsWith('.'))

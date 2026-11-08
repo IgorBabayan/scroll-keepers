@@ -10,16 +10,22 @@ namespace ScrollKeeper.Services.Addons;
 /// <param name="MinAddOnVersion">Lowest accepted <c>## AddOnVersion</c>, or <c>null</c> for any version.</param>
 public sealed record AddonDependency(string Name, int? MinAddOnVersion)
 {
-    /// <summary>Parses a space-separated dependency list and appends its entries to <paramref name="target"/>.</summary>
+    /// <summary>
+    /// Parses a space-separated dependency list and appends its entries to <paramref name="target"/>.
+    /// A name listed again (e.g. in both <c>DependsOn</c> and <c>PCDependsOn</c>) keeps the highest minimum version.
+    /// </summary>
     public static void ParseList(string value, List<AddonDependency> target)
     {
         foreach (var token in AddonManifest.StripFormatting(value).Split(' ', StringSplitOptions.RemoveEmptyEntries))
         {
-            if (TryParse(token) is { } dependency
-                && !target.Exists(d => string.Equals(d.Name, dependency.Name, StringComparison.OrdinalIgnoreCase)))
-            {
+            if (TryParse(token) is not { } dependency)
+                continue;
+
+            var index = target.FindIndex(d => string.Equals(d.Name, dependency.Name, StringComparison.OrdinalIgnoreCase));
+            if (index < 0)
                 target.Add(dependency);
-            }
+            else if (dependency.MinAddOnVersion > (target[index].MinAddOnVersion ?? int.MinValue))
+                target[index] = target[index] with { MinAddOnVersion = dependency.MinAddOnVersion };
         }
     }
 

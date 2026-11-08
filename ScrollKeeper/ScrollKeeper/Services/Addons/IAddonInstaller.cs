@@ -22,9 +22,13 @@ public interface IAddonInstaller
     /// Downloads the current upload of <paramref name="addon"/>, replaces its folders in
     /// <paramref name="addonsFolder"/> and records the installed version.
     /// </summary>
+    /// <param name="asDependency">
+    /// Installed because another addon requires it. An update keeps the reason of the first install.
+    /// </param>
     Task<InstallRecord> InstallAsync(
         CatalogAddon addon,
         string addonsFolder,
         IProgress<InstallProgress>? progress,
+        bool asDependency = false,
         CancellationToken cancellationToken = default);
 }

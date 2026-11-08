@@ -1,4 +1,5 @@
 using ScrollKeeper.Presentation.ViewModels.Addons;
+using ScrollKeeper.Services.Addons;
 
 namespace ScrollKeeper.Presentation.Services;
 
@@ -13,4 +14,7 @@ public interface IWindowService
 
     /// <summary>Shows the full-size pictures of an addon page, starting at <paramref name="index"/> (modal).</summary>
     void ShowImageViewer(string title, IReadOnlyList<ScreenshotViewModel> pictures, int index);
+
+    /// <summary>Shows what removing an addon deletes. Returns <c>true</c> if the user confirmed.</summary>
+    bool ConfirmRemoval(string addonName, RemovalPlan plan);
 }
