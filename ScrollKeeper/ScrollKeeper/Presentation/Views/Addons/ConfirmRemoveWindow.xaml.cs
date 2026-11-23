@@ -34,6 +34,14 @@ public partial class ConfirmRemoveWindow : Window
         if (plan.SavedVariablesFiles.Count > 0)
             sections.Add(new("Saved settings", plan.SavedVariablesFiles.Select(Path.GetFileName).OfType<string>().ToList(), IsWarning: false));
 
+        if (plan.SavedVariablesCleanups.Count > 0)
+        {
+            sections.Add(new(
+                "Saved settings removed from other files",
+                plan.SavedVariablesCleanups.Select(c => $"{Path.GetFileName(c.File)}: {string.Join(", ", c.Globals)}").ToList(),
+                IsWarning: false));
+        }
+
         if (plan.KeptDependencies.Count > 0)
             sections.Add(new("Kept, other addons still use them", plan.KeptDependencies, IsWarning: false));
 

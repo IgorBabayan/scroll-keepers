@@ -361,7 +361,7 @@ public sealed partial class MainViewModel : ViewModelBase, IAddonActions
             var details = new List<string>(2);
             if (plan.UnusedDependencies.Count > 0)
                 details.Add($"Also removed: {string.Join(", ", plan.UnusedDependencies)}");
-            if (plan.SavedVariablesFiles.Count > 0)
+            if (plan.RemovesSavedVariables)
                 details.Add("Saved settings deleted.");
             var text = details.Count > 0 ? string.Join("\n", details) : null;
             _toasts.Show($"{name} removed", ToastSeverity.Success).Details = text;

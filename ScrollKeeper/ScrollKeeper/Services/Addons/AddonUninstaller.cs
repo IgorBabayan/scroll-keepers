@@ -1,9 +1,11 @@
 using System.Diagnostics;
 using System.IO;
+using System.Text;
+using System.Text.RegularExpressions;
 
 namespace ScrollKeeper.Services.Addons;
 
-public sealed class AddonUninstaller(IInstallRecordStore records) : IAddonUninstaller
+public sealed partial class AddonUninstaller(IInstallRecordStore records) : IAddonUninstaller
 {
     public RemovalPlan Plan(string addonsFolder, InstalledAddon addon)
     {
@@ -95,8 +97,128 @@ public sealed class AddonUninstaller(IInstallRecordStore records) : IAddonUninst
             }
         }
 
-        return new RemovalPlan(null, addonFolders, unused, kept, savedVariables, requiredBy);
+        // The same globals (## SavedVariables: in the manifests) can also sit in other files, e.g. left by
+        // an older or renamed copy of the addon. Globals another remaining addon also declares stay.
+        var cleanups = new List<SavedVariablesCleanup>();
+        if (savedVariablesFolder is not null)
+        {
+            var removedGlobals = removal
+                .Where(folders.ContainsKey)
+                .SelectMany(f => folders[f].SavedVariables)
+                .ToHashSet(StringComparer.Ordinal);
+            removedGlobals.ExceptWith(remaining.SelectMany(f => f.SavedVariables));
+
+            if (removedGlobals.Count > 0)
+                FindSavedVariablesGlobals(savedVariablesFolder, removedGlobals, savedVariables, cleanups);
+        }
+
+        return new RemovalPlan(null, addonFolders, unused, kept, savedVariables, cleanups, requiredBy);
     }
+
+    /// <summary>
+    /// Looks through every <c>SavedVariables\*.lua</c> not already deleted for top-level assignments of
+    /// <paramref name="globals"/>: a file holding nothing else is deleted whole, otherwise only those globals are cut out.
+    /// </summary>
+    internal static void FindSavedVariablesGlobals(
+        string savedVariablesFolder,
+        IReadOnlySet<string> globals,
+        List<string> filesToDelete,
+        List<SavedVariablesCleanup> cleanups)
+    {
+        if (!Directory.Exists(savedVariablesFolder))
+            return;
+
+        var deleted = filesToDelete.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        IEnumerable<string> files;
+        try
+        {
+            files = Directory.EnumerateFiles(savedVariablesFolder, "*.lua").Order(StringComparer.OrdinalIgnoreCase).ToList();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Debug.WriteLine($"Could not list {savedVariablesFolder}: {ex.Message}");
+            return;
+        }
+
+        foreach (var file in files)
+        {
+            // The game's own settings (ZO_Ingame.lua, ZO_Pregame.lua, ...) are never touched.
+            if (deleted.Contains(file) || Path.GetFileName(file).StartsWith("ZO_", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            List<string> declared;
+            try
+            {
+                declared = ReadTopLevelGlobals(File.ReadLines(file));
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                Debug.WriteLine($"Could not read {file}: {ex.Message}");
+                continue;
+            }
+
+            var matched = declared.Where(globals.Contains).Distinct(StringComparer.Ordinal).ToList();
+            if (matched.Count == 0)
+                continue;
+
+            if (declared.All(globals.Contains))
+                filesToDelete.Add(file);
+            else
+                cleanups.Add(new SavedVariablesCleanup(file, matched));
+        }
+    }
+
+    /// <summary>Names assigned at the top level of a saved-variables file (<c>Name =</c> at the start of a line).</summary>
+    internal static List<string> ReadTopLevelGlobals(IEnumerable<string> lines)
+    {
+        var result = new List<string>();
+        foreach (var line in lines)
+        {
+            // The game writes the table contents indented, so only top-level assignments start with a name.
+            if (line.Length == 0 || !(char.IsAsciiLetter(line[0]) || line[0] == '_'))
+                continue;
+
+            var match = TopLevelAssignmentRegex().Match(line);
+            if (match.Success)
+                result.Add(match.Groups[1].Value);
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Cuts the top-level assignments of <paramref name="globals"/> out of a saved-variables file's text;
+    /// each one runs up to the next top-level assignment (or the end of the file).
+    /// </summary>
+    internal static string StripGlobals(string text, IReadOnlySet<string> globals)
+    {
+        var builder = new StringBuilder(text.Length);
+        var skipping = false;
+        var start = 0;
+
+        while (start < text.Length)
+        {
+            var end = text.IndexOf('\n', start);
+            end = end < 0 ? text.Length : end + 1;
+            var line = text[start..end];
+
+            if (line.Length > 0 && (char.IsAsciiLetter(line[0]) || line[0] == '_'))
+            {
+                var match = TopLevelAssignmentRegex().Match(line.TrimEnd('\r', '\n'));
+                if (match.Success)
+                    skipping = globals.Contains(match.Groups[1].Value);
+            }
+
+            if (!skipping)
+                builder.Append(line);
+            start = end;
+        }
+
+        return builder.ToString();
+    }
+
+    [GeneratedRegex(@"^([A-Za-z_][A-Za-z0-9_]*)\s*=")]
+    private static partial Regex TopLevelAssignmentRegex();
 
     public void Remove(string addonsFolder, RemovalPlan plan)
     {
@@ -139,6 +261,38 @@ public sealed class AddonUninstaller(IInstallRecordStore records) : IAddonUninst
                 Debug.WriteLine($"Could not delete {file}: {ex.Message}");
             }
         }
+
+        foreach (var cleanup in plan.SavedVariablesCleanups)
+        {
+            var temp = cleanup.File + ".scrollkeeper.tmp";
+            try
+            {
+                if (!File.Exists(cleanup.File))
+                    continue;
+
+                var text = File.ReadAllText(cleanup.File);
+                var stripped = StripGlobals(text, cleanup.Globals.ToHashSet(StringComparer.Ordinal));
+                if (stripped.Length == text.Length)
+                    continue;
+
+                // Written beside the original and swapped in, so a failure never leaves a half-written file.
+                File.WriteAllText(temp, stripped, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+                File.Move(temp, cleanup.File, overwrite: true);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                Debug.WriteLine($"Could not clean {cleanup.File}: {ex.Message}");
+                try
+                {
+                    if (File.Exists(temp))
+                        File.Delete(temp);
+                }
+                catch (Exception cleanupEx) when (cleanupEx is IOException or UnauthorizedAccessException)
+                {
+                    Debug.WriteLine($"Could not delete {temp}: {cleanupEx.Message}");
+                }
+            }
+        }
     }
 
     // ===== AddOns folder =====
@@ -150,13 +304,15 @@ public sealed class AddonUninstaller(IInstallRecordStore records) : IAddonUninst
     /// <param name="Provides">Addon names loaded from it: the folder itself and the addons nested in it.</param>
     /// <param name="Requires">Required dependencies of all those addons.</param>
     /// <param name="Uses">Required and optional dependencies of all those addons.</param>
+    /// <param name="SavedVariables">Saved-variable globals declared by all those addons (<c>## SavedVariables:</c>).</param>
     internal sealed record FolderInfo(
         string Name,
         string Title,
         bool IsLibrary,
         IReadOnlySet<string> Provides,
         IReadOnlySet<string> Requires,
-        IReadOnlySet<string> Uses);
+        IReadOnlySet<string> Uses,
+        IReadOnlySet<string> SavedVariables);
 
     internal static Dictionary<string, FolderInfo> ScanFolders(string addonsFolder)
     {
@@ -180,8 +336,9 @@ public sealed class AddonUninstaller(IInstallRecordStore records) : IAddonUninst
             var requires = manifests.SelectMany(m => m.Manifest.DependsOn).Select(d => d.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
             var uses = manifests.SelectMany(m => m.Manifest.OptionalDependsOn).Select(d => d.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
             uses.UnionWith(requires);
+            var savedVariables = manifests.SelectMany(m => m.Manifest.SavedVariables).ToHashSet(StringComparer.Ordinal);
 
-            result[name] = new FolderInfo(name, own?.Title ?? name, own?.IsLibrary == true, provides, requires, uses);
+            result[name] = new FolderInfo(name, own?.Title ?? name, own?.IsLibrary == true, provides, requires, uses, savedVariables);
         }
 
         return result;

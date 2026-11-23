@@ -9,7 +9,7 @@
         xmlns:shellViews="clr-namespace:ScrollKeeper.Presentation.Views.Shell"
         mc:Ignorable="d"
         d:DataContext="{d:DesignInstance Type=shellVm:MainViewModel, IsDesignTimeCreatable=False}"
-        Title="ScrollKeeper"
+        Title="Scroll Keeper"
         Width="1100"
         Height="720"
         MinWidth="760"
