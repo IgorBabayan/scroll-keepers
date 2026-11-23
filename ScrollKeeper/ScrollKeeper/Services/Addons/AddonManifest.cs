@@ -15,7 +15,8 @@ public sealed partial record AddonManifest(
     bool IsLibrary,
     string Description,
     IReadOnlyList<AddonDependency> DependsOn,
-    IReadOnlyList<AddonDependency> OptionalDependsOn)
+    IReadOnlyList<AddonDependency> OptionalDependsOn,
+    IReadOnlyList<string> SavedVariables)
 {
     /// <summary>Manifest files are small; stop reading suspiciously large ones.</summary>
     private const int MaxLines = 400;
@@ -25,6 +26,7 @@ public sealed partial record AddonManifest(
         var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var dependsOn = new List<AddonDependency>();
         var optionalDependsOn = new List<AddonDependency>();
+        var savedVariables = new List<string>();
 
         foreach (var raw in lines.Take(MaxLines))
         {
@@ -55,8 +57,22 @@ public sealed partial record AddonManifest(
                 continue;
             }
 
+            // Names of the global tables the game saves to SavedVariables\<Folder>.lua (space separated).
+            if (key.Equals("SavedVariables", StringComparison.OrdinalIgnoreCase)
+                || key.Equals("PCSavedVariables", StringComparison.OrdinalIgnoreCase))
+            {
+                foreach (var name in value.Split([' ', '\t', ','], StringSplitOptions.RemoveEmptyEntries))
+                {
+                    if (!savedVariables.Contains(name, StringComparer.Ordinal))
+                        savedVariables.Add(name);
+                }
+
+                continue;
+            }
+
             if (key.StartsWith("Console", StringComparison.OrdinalIgnoreCase)
-                && key.EndsWith("DependsOn", StringComparison.OrdinalIgnoreCase))
+                && (key.EndsWith("DependsOn", StringComparison.OrdinalIgnoreCase)
+                    || key.EndsWith("SavedVariables", StringComparison.OrdinalIgnoreCase)))
             {
                 continue;
             }
@@ -77,7 +93,8 @@ public sealed partial record AddonManifest(
             string.Equals(headers.GetValueOrDefault("IsLibrary"), "true", StringComparison.OrdinalIgnoreCase),
             StripFormatting(headers.GetValueOrDefault("Description")),
             dependsOn,
-            optionalDependsOn);
+            optionalDependsOn,
+            savedVariables);
     }
 
     /// <summary>Reads the manifest of an addon folder, or returns <c>null</c> if the folder is not an addon.</summary>
