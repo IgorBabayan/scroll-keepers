@@ -136,7 +136,7 @@ public sealed partial class AutoUpdater(
             // Network problem, bad download or the UAC prompt was declined: keep running the current version.
             Debug.WriteLine($"Update failed: {ex}");
             toastService.Show("Update failed", ToastSeverity.Error).Details = Describe(ex);
-            notifications.Add("ScrollKeeper update failed", ToastSeverity.Error, Describe(ex))
+            notifications.Add("Scroll Keeper update failed", ToastSeverity.Error, Describe(ex))
                 .SetAction("Try again", () => _ = DownloadAndInstallAsync());
         }
         finally
@@ -156,7 +156,7 @@ public sealed partial class AutoUpdater(
 
         using var cancellation = new CancellationTokenSource();
         var toast = toastService.ShowPersistent(RestartMessage(seconds));
-        toast.Details = "ScrollKeeper starts again automatically after installation.";
+        toast.Details = "Scroll Keeper starts again automatically after installation.";
         toast.SetAction("Cancel", cancellation.Cancel);
 
         try
@@ -202,14 +202,14 @@ public sealed partial class AutoUpdater(
         var version = update.Version.ToString(3);
         if (CanInstall)
         {
-            notifications.Set(AppUpdateKey, $"ScrollKeeper {version} is available", ToastSeverity.Info,
+            notifications.Set(AppUpdateKey, $"Scroll Keeper {version} is available", ToastSeverity.Info,
                 "Download it now; the application restarts into the new version.",
                 "Download and update", () => _ = DownloadAndInstallAsync());
         }
         else
         {
             // Not an installed copy (e.g. run from the build folder): the update cannot be installed in place.
-            notifications.Set(AppUpdateKey, $"ScrollKeeper {version} is available", ToastSeverity.Info,
+            notifications.Set(AppUpdateKey, $"Scroll Keeper {version} is available", ToastSeverity.Info,
                 "Install it with the installer from the release page.",
                 "Open release page",
                 update.ReleasePageUrl is { } page ? () => OpenUrl(page) : null);
