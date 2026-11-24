@@ -14,7 +14,9 @@
   #define OutputDir "..\dist"
 #endif
 
-#define AppName "ScrollKeeper"
+#define AppName "Scroll Keeper"
+; Folder name kept without a space so existing installs and upgrades use the same location.
+#define AppDirName "ScrollKeeper"
 #define AppExeName "ScrollKeeper.exe"
 #define AppPublisher "IgorBabayan"
 #define AppUrl "https://github.com/IgorBabayan/scroll-keepers"
@@ -29,7 +31,7 @@ AppPublisherURL={#AppUrl}
 AppSupportURL={#AppUrl}/issues
 AppUpdatesURL={#AppUrl}/releases
 VersionInfoVersion={#AppVersion}
-DefaultDirName={autopf}\{#AppName}
+DefaultDirName={autopf}\{#AppDirName}
 DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
 LicenseFile=..\LICENSE
@@ -59,6 +61,11 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+[InstallDelete]
+; Remove shortcuts created by older versions under the previous name "ScrollKeeper".
+Type: files; Name: "{autoprograms}\ScrollKeeper.lnk"
+Type: files; Name: "{autodesktop}\ScrollKeeper.lnk"
 
 [Icons]
 Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExeName}"
