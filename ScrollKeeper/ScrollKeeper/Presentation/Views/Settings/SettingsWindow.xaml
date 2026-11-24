@@ -117,7 +117,7 @@
                             Margin="8,0,0,0"
                             Style="{StaticResource AccentButtonStyle}"
                             Content="_Download and update"
-                            ToolTip="Download the new version, then restart ScrollKeeper to install it"
+                            ToolTip="Download the new version, then restart Scroll Keeper to install it"
                             Command="{Binding DownloadAndUpdateCommand}" />
                     <Button DockPanel.Dock="Right"
                             Style="{StaticResource DialogButtonStyle}"
@@ -126,7 +126,7 @@
                 </DockPanel>
                 <TextBlock Style="{StaticResource SecondaryTextStyle}"
                            Margin="26,4,0,0"
-                           Text="On every start, check GitHub for a newer release. If one is found, it is downloaded and installed, and ScrollKeeper restarts automatically." />
+                           Text="On every start, check GitHub for a newer release. If one is found, it is downloaded and installed, and Scroll Keeper restarts automatically." />
                 <TextBlock Margin="26,4,0,0"
                            FontSize="12"
                            Foreground="{DynamicResource AccentBrush}"
