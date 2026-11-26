@@ -46,11 +46,15 @@ public sealed partial class MainViewModel : ViewModelBase, IAddonActions
     private HashSet<string> _notifiedUpdates = new(StringComparer.Ordinal);
     /// <summary>Everything in the AddOns folder, unsorted; <see cref="InstalledRows"/> is what the list shows.</summary>
     private readonly List<AddonItemViewModel> _installed = [];
+    /// <summary>Same items as <see cref="_installed"/>, for constant-time membership checks during a rescan.</summary>
+    private readonly HashSet<AddonItemViewModel> _installedSet = [];
     /// <summary>Replaced as a whole when the catalog loads (see <see cref="ApplyCatalog"/>).</summary>
     private List<AddonItemViewModel> _browse = [];
     /// <summary>A rebuild of <see cref="InstalledRows"/> is queued (several changes arrive at once).</summary>
     private bool _isInstalledRebuildQueued;
     private readonly SemaphoreSlim _refreshLock = new(1, 1);
+    /// <summary>A rescan waiting for the one in progress; later requests join it instead of queuing their own.</summary>
+    private Task? _queuedRefresh;
     private readonly DispatcherTimer _installedSearchTimer;
     private readonly DispatcherTimer _browseSearchTimer;
 
@@ -520,9 +524,28 @@ public sealed partial class MainViewModel : ViewModelBase, IAddonActions
     }
 
     /// <summary>Scans the AddOns folder and matches it against the catalog (if loaded).</summary>
-    private async Task RefreshInstalledAsync()
+    /// <remarks>
+    /// Every install and removal rescans the folder (and "Update all" runs several at once). A rescan that has not
+    /// started yet will see every change made so far, so requests made while one is queued share it: a burst of
+    /// finished installs costs one extra scan instead of one each.
+    /// </remarks>
+    private Task RefreshInstalledAsync()
     {
-        await _refreshLock.WaitAsync();
+        if (_queuedRefresh is { } queued)
+            return queued;
+
+        var gate = _refreshLock.WaitAsync();
+        if (gate.IsCompleted)
+            return RefreshInstalledCoreAsync(gate);
+
+        return _queuedRefresh = RefreshInstalledCoreAsync(gate);
+    }
+
+    private async Task RefreshInstalledCoreAsync(Task gate)
+    {
+        await gate;
+        // From here on, new changes may be missed by this scan: they need a new one.
+        _queuedRefresh = null;
         try
         {
             var folder = _settings.AddonsFolder;
@@ -539,17 +562,23 @@ public sealed partial class MainViewModel : ViewModelBase, IAddonActions
                 keys.Add(addon.Key);
                 var item = GetOrCreateItem(addon.Key);
                 item.SetInstalled(addon);
-                if (!_installed.Contains(item))
+                if (_installedSet.Add(item))
                 {
                     _installed.Add(item);
                     item.PropertyChanged += OnInstalledItemPropertyChanged;
                 }
             }
 
-            foreach (var item in _installed.Where(i => !keys.Contains(i.Key)).ToList())
+            var removed = _installed.Where(i => !keys.Contains(i.Key)).ToList();
+            if (removed.Count > 0)
+            {
+                _installedSet.ExceptWith(removed);
+                _installed.RemoveAll(i => !_installedSet.Contains(i));
+            }
+
+            foreach (var item in removed)
             {
                 item.SetInstalled(null);
-                _installed.Remove(item);
                 item.PropertyChanged -= OnInstalledItemPropertyChanged;
                 // Local-only addons exist only while they are installed.
                 if (item.Catalog is null && !item.IsBusy)
@@ -650,8 +679,8 @@ public sealed partial class MainViewModel : ViewModelBase, IAddonActions
     /// <summary>Filtered by the Browse search box and sorted by the selected option.</summary>
     private void RebuildBrowseItems()
     {
-        var search = BrowseSearchText;
-        var items = _browse.Where(i => Matches(i, search)).ToList();
+        var search = BrowseSearchText.Trim();
+        var items = search.Length == 0 ? new List<AddonItemViewModel>(_browse) : _browse.Where(i => Matches(i, search)).ToList();
 
         // SelectedSortOption is still null while the constructor runs.
         if (SelectedSortOption is { } sort)
@@ -664,7 +693,7 @@ public sealed partial class MainViewModel : ViewModelBase, IAddonActions
     {
         _isInstalledRebuildQueued = false;
 
-        var search = InstalledSearchText;
+        var search = InstalledSearchText.Trim();
         var rows = new List<object>(_installed.Count + 2);
         var groups = _installed
             .Where(i => Matches(i, search))
@@ -752,12 +781,12 @@ public sealed partial class MainViewModel : ViewModelBase, IAddonActions
             target.RemoveAt(target.Count - 1);
     }
 
-    private static bool Matches(AddonItemViewModel item, string search)
+    /// <param name="text">Search text, already trimmed (an empty one matches everything).</param>
+    private static bool Matches(AddonItemViewModel item, string text)
     {
-        if (string.IsNullOrWhiteSpace(search))
+        if (text.Length == 0)
             return true;
 
-        var text = search.Trim();
         return item.Name.Contains(text, StringComparison.CurrentCultureIgnoreCase)
                || item.Author.Contains(text, StringComparison.CurrentCultureIgnoreCase)
                || (item.CategoryTitle?.Contains(text, StringComparison.CurrentCultureIgnoreCase) ?? false)
