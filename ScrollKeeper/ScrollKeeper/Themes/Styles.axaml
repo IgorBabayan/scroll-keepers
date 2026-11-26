@@ -1,0 +1,70 @@
+<!--
+    Recolors the stock Fluent controls with the Claude palette (Themes/Colors/*.axaml).
+    Styles here win over the Fluent control themes; state styles (:pointerover, :focus) must be repeated,
+    because a state style of a control theme wins over a plain style.
+    Only controls that keep their Fluent template are styled here; the others have their own
+    control themes in Themes/Controls.axaml and Themes/WindowChrome.axaml.
+-->
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- ===== TextBox (app-wide) ===== -->
+    <Style Selector="TextBox">
+        <Setter Property="Foreground" Value="{DynamicResource WindowForegroundBrush}" />
+        <Setter Property="Background" Value="{DynamicResource ControlBackgroundBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
+        <Setter Property="CaretBrush" Value="{DynamicResource WindowForegroundBrush}" />
+        <Setter Property="SelectionBrush" Value="{DynamicResource AccentBrush}" />
+        <Setter Property="SelectionForegroundBrush" Value="{DynamicResource AccentForegroundBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="4" />
+        <Setter Property="Padding" Value="6,5" />
+        <Setter Property="MinHeight" Value="32" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="TextBox:pointerover">
+        <Setter Property="Foreground" Value="{DynamicResource WindowForegroundBrush}" />
+    </Style>
+    <Style Selector="TextBox:focus">
+        <Setter Property="Foreground" Value="{DynamicResource WindowForegroundBrush}" />
+    </Style>
+    <Style Selector="TextBox:pointerover /template/ Border#PART_BorderElement">
+        <Setter Property="Background" Value="{DynamicResource ControlBackgroundBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource ControlHoverBorderBrush}" />
+    </Style>
+    <Style Selector="TextBox:focus /template/ Border#PART_BorderElement">
+        <Setter Property="Background" Value="{DynamicResource ControlBackgroundBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="TextBox:disabled">
+        <Setter Property="Opacity" Value="0.5" />
+    </Style>
+    <Style Selector="TextBox /template/ TextBlock#PART_Watermark">
+        <Setter Property="Foreground" Value="{DynamicResource SecondaryForegroundBrush}" />
+    </Style>
+    <Style Selector="TextBox:pointerover /template/ TextBlock#PART_Watermark">
+        <Setter Property="Foreground" Value="{DynamicResource SecondaryForegroundBrush}" />
+    </Style>
+    <Style Selector="TextBox:focus /template/ TextBlock#PART_Watermark">
+        <Setter Property="Foreground" Value="{DynamicResource SecondaryForegroundBrush}" />
+    </Style>
+
+    <!-- Search box: rounder, with the search glyph in InnerLeftContent and the placeholder in Watermark. -->
+    <Style Selector="TextBox.search">
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Padding" Value="6,5,8,5" />
+    </Style>
+
+    <!-- ===== Selectable text (addon descriptions) ===== -->
+    <Style Selector="SelectableTextBlock">
+        <Setter Property="SelectionBrush" Value="{DynamicResource AccentBrush}" />
+    </Style>
+
+    <!-- ===== ToolTip ===== -->
+    <Style Selector="ToolTip">
+        <Setter Property="FontFamily" Value="{DynamicResource BodyFont}" />
+        <Setter Property="FontSize" Value="12" />
+    </Style>
+
+</Styles>

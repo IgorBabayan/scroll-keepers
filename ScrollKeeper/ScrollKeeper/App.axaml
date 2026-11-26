@@ -1,0 +1,33 @@
+﻿<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="ScrollKeeper.App"
+             Name="Scroll Keeper"
+             RequestedThemeVariant="Default">
+
+    <!--
+        Fluent provides the stock control templates (TextBox, ScrollViewer, ToolTip...);
+        Themes/Styles.axaml recolors them with the Claude palette.
+    -->
+    <Application.Styles>
+        <FluentTheme />
+        <StyleInclude Source="avares://ScrollKeeper/Themes/Styles.axaml" />
+    </Application.Styles>
+
+    <Application.Resources>
+        <ResourceDictionary>
+            <!--
+                Active color palette: Avalonia picks the dictionary that matches the app's theme variant, which follows
+                the system light/dark mode (see IThemeService) and switches live when it changes.
+            -->
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceInclude x:Key="Dark" Source="avares://ScrollKeeper/Themes/Colors/ClaudeDark.axaml" />
+                <ResourceInclude x:Key="Light" Source="avares://ScrollKeeper/Themes/Colors/ClaudeLight.axaml" />
+            </ResourceDictionary.ThemeDictionaries>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceInclude Source="avares://ScrollKeeper/Themes/WindowChrome.axaml" />
+                <ResourceInclude Source="avares://ScrollKeeper/Themes/Controls.axaml" />
+                <ResourceInclude Source="avares://ScrollKeeper/Presentation/Views/Addons/AddonResources.axaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

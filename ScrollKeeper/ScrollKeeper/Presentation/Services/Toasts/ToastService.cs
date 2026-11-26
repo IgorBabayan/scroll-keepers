@@ -1,5 +1,5 @@
 using System.Collections.ObjectModel;
-using System.Windows.Threading;
+using Avalonia.Threading;
 
 namespace ScrollKeeper.Presentation.Services.Toasts;
 

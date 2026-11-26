@@ -1,9 +1,8 @@
 using System.Diagnostics;
-using System.IO;
 using System.Net;
-using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text.Json;
 
@@ -12,6 +11,9 @@ namespace ScrollKeeper.Services.Updates;
 /// <summary>
 /// Uses the latest published GitHub Release of <c>IgorBabayan/scroll-keepers</c>
 /// (created by <c>.github/workflows/release-installer.yml</c>) as the update source.
+/// The release carries the Windows installer and the Linux / macOS packages; each platform picks its own asset.
+/// Only the Windows installer can update the app in place; on Linux and macOS a new version is announced and
+/// downloaded from the release page.
 /// </summary>
 public sealed class GitHubUpdateService : IUpdateService, IDisposable
 {
@@ -39,7 +41,8 @@ public sealed class GitHubUpdateService : IUpdateService, IDisposable
     {
         var version = Assembly.GetEntryAssembly()?.GetName().Version ?? new Version(0, 0, 0);
         CurrentVersion = Normalize(version);
-        IsInstalled = File.Exists(Path.Combine(AppContext.BaseDirectory, UninstallerFileName));
+        IsInstalled = OperatingSystem.IsWindows()
+                      && File.Exists(Path.Combine(AppContext.BaseDirectory, UninstallerFileName));
 
         // Timeouts are controlled per call with cancellation tokens (downloads may take a while).
         _http = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
@@ -75,7 +78,7 @@ public sealed class GitHubUpdateService : IUpdateService, IDisposable
         if (latest <= CurrentVersion)
             return null;
 
-        var asset = SelectInstaller(release.Assets);
+        var asset = SelectAsset(release.Assets);
         if (asset is null || !Uri.TryCreate(asset.BrowserDownloadUrl, UriKind.Absolute, out var downloadUrl))
             return null;
 
@@ -142,6 +145,8 @@ public sealed class GitHubUpdateService : IUpdateService, IDisposable
     public void LaunchInstaller(string installerPath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(installerPath);
+        if (!OperatingSystem.IsWindows())
+            throw new PlatformNotSupportedException("Updates are installed automatically on Windows only.");
 
         var logPath = Path.Combine(DownloadFolder, "install.log");
 
@@ -192,17 +197,30 @@ public sealed class GitHubUpdateService : IUpdateService, IDisposable
             throw new InvalidDataException("Downloaded installer failed the SHA-256 check.");
     }
 
-    private static AssetDto? SelectInstaller(IReadOnlyList<AssetDto>? assets)
+    /// <summary>The asset for this platform: the Windows installer, or the Linux / macOS package of this CPU.</summary>
+    private static AssetDto? SelectAsset(IReadOnlyList<AssetDto>? assets)
     {
         if (assets is null)
             return null;
 
-        var installers = assets
-            .Where(a => a.Name?.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) == true)
-            .ToList();
+        if (OperatingSystem.IsWindows())
+        {
+            var installers = assets
+                .Where(a => a.Name?.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) == true)
+                .ToList();
 
-        return installers.FirstOrDefault(a => a.Name!.StartsWith(InstallerPrefix, StringComparison.OrdinalIgnoreCase))
-               ?? (installers.Count == 1 ? installers[0] : null);
+            return installers.FirstOrDefault(a => a.Name!.StartsWith(InstallerPrefix, StringComparison.OrdinalIgnoreCase))
+                   ?? (installers.Count == 1 ? installers[0] : null);
+        }
+
+        // ScrollKeeper-<version>-linux-x64.tar.gz, ScrollKeeper-<version>-osx-arm64.zip, ...
+        var os = OperatingSystem.IsMacOS() ? "osx" : "linux";
+        var architecture = RuntimeInformation.OSArchitecture == Architecture.Arm64 ? "arm64" : "x64";
+        var suffix = $"-{os}-{architecture}.";
+
+        return assets.FirstOrDefault(a =>
+            a.Name?.StartsWith("ScrollKeeper", StringComparison.OrdinalIgnoreCase) == true
+            && a.Name.Contains(suffix, StringComparison.OrdinalIgnoreCase));
     }
 
     private static bool TryParseVersion(string? tag, out Version version)

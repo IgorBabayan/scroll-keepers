@@ -1,12 +1,13 @@
-using System.Windows;
+using Avalonia.Input;
+using ScrollKeeper.Presentation.Controls;
 using ScrollKeeper.Presentation.ViewModels.Settings;
 
 namespace ScrollKeeper.Presentation.Views.Settings;
 
 /// <summary>
-/// Interaction logic for SettingsWindow.xaml
+/// Interaction logic for SettingsWindow.axaml
 /// </summary>
-public partial class SettingsWindow : Window
+public partial class SettingsWindow : ChromeWindow
 {
     private readonly SettingsViewModel _viewModel;
 
@@ -15,15 +16,17 @@ public partial class SettingsWindow : Window
         InitializeComponent();
         DataContext = _viewModel = viewModel;
 
+        AddKeyBinding(Key.Escape, KeyModifiers.None, _viewModel.CancelCommand);
+
         _viewModel.CloseRequested += OnCloseRequested;
         Closed += OnClosed;
     }
 
+    /// <summary>Closes the dialog; the result (saved or not) is returned by <c>ShowDialog</c>.</summary>
     private void OnCloseRequested(object? sender, bool saved)
     {
-        // Setting DialogResult on a modal window closes it.
         if (IsVisible)
-            DialogResult = saved;
+            Close(saved);
     }
 
     private void OnClosed(object? sender, EventArgs e)

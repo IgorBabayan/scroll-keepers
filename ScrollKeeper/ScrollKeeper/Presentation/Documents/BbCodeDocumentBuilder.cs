@@ -1,16 +1,21 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Net;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Documents;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Controls.Documents;
+using Avalonia.Layout;
+using Avalonia.Media;
+using Avalonia.Media.Immutable;
+using ScrollKeeper.Services.Images;
 
 namespace ScrollKeeper.Presentation.Documents;
 
-/// <summary>Renders ESOUI BBCode as a themed <see cref="FlowDocument"/>.</summary>
-internal static class BbCodeDocumentBuilder
+/// <summary>
+/// Renders ESOUI BBCode as themed Avalonia controls: a stack of selectable paragraphs (<see cref="BbParagraph"/>),
+/// lists, quotes and code blocks. Theme colors are resource references, so the document follows theme changes.
+/// </summary>
+internal sealed class BbCodeDocumentBuilder
 {
     private static readonly HashSet<string> BlockTags = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -20,26 +25,33 @@ internal static class BbCodeDocumentBuilder
     /// <summary>vBulletin [size=1..7] → points.</summary>
     private static readonly double[] FontSizes = [10, 11, 13, 15, 18, 22, 28];
 
-    public static FlowDocument Build(string? bbcode)
+    /// <summary>Pictures inside descriptions are shown at most this large.</summary>
+    private const double MaxImageWidth = 560;
+    private const double MaxImageHeight = 420;
+
+    /// <summary>Control whose resources (palette, fonts) the document uses.</summary>
+    private readonly Control _host;
+
+    private BbCodeDocumentBuilder(Control host)
     {
-        var document = new FlowDocument
-        {
-            PagePadding = new Thickness(0),
-            FontSize = 13,
-            LineHeight = double.NaN,
-            TextAlignment = TextAlignment.Left
-        };
-        document.SetResourceReference(FlowDocument.FontFamilyProperty, "BodyFont");
-        document.SetResourceReference(FlowDocument.ForegroundProperty, "WindowForegroundBrush");
+        _host = host;
+    }
 
-        RenderBlocks(BbCodeParser.Parse(bbcode).Children, document.Blocks, TextAlignment.Left);
-        Tidy(document.Blocks);
+    public static Control Build(string? bbcode, Control host) => new BbCodeDocumentBuilder(host).BuildDocument(bbcode);
 
-        if (document.Blocks.Count == 0)
+    private Control BuildDocument(string? bbcode)
+    {
+        var document = new StackPanel();
+
+        RenderBlocks(BbCodeParser.Parse(bbcode).Children, document.Children, TextAlignment.Left);
+        Tidy(document.Children);
+
+        if (document.Children.Count == 0)
         {
-            var empty = new Paragraph(new Run("No information."));
-            empty.SetResourceReference(TextElement.ForegroundProperty, "SecondaryForegroundBrush");
-            document.Blocks.Add(empty);
+            var empty = NewParagraph(TextAlignment.Left);
+            empty.Inlines!.Add(new Run("No information."));
+            UseResource(empty, TextBlock.ForegroundProperty, "SecondaryForegroundBrush");
+            document.Children.Add(empty);
         }
 
         return document;
@@ -47,9 +59,9 @@ internal static class BbCodeDocumentBuilder
 
     // ===== Blocks =====
 
-    private static void RenderBlocks(IEnumerable<BbNode> nodes, BlockCollection blocks, TextAlignment alignment)
+    private void RenderBlocks(IEnumerable<BbNode> nodes, Avalonia.Controls.Controls blocks, TextAlignment alignment)
     {
-        Paragraph? paragraph = null;
+        BbParagraph? paragraph = null;
 
         foreach (var node in nodes)
         {
@@ -62,32 +74,22 @@ internal static class BbCodeDocumentBuilder
 
             if (paragraph is null)
             {
-                paragraph = new Paragraph { Margin = new Thickness(0, 0, 0, 8), TextAlignment = alignment };
+                paragraph = NewParagraph(alignment);
                 blocks.Add(paragraph);
             }
 
-            RenderInline(node, paragraph.Inlines);
+            RenderInline(node, paragraph.Inlines!, paragraph);
         }
     }
 
-    private static Block RenderBlock(BbTag tag, TextAlignment alignment)
+    private Control RenderBlock(BbTag tag, TextAlignment alignment)
     {
         switch (tag.Name)
         {
             case "list":
             {
-                var list = new List
-                {
-                    Margin = new Thickness(0, 0, 0, 8),
-                    Padding = new Thickness(22, 0, 0, 0),
-                    MarkerStyle = tag.Argument?.ToLowerInvariant() switch
-                    {
-                        "1" => TextMarkerStyle.Decimal,
-                        "a" => TextMarkerStyle.LowerLatin,
-                        "i" => TextMarkerStyle.LowerRoman,
-                        _ => TextMarkerStyle.Disc
-                    }
-                };
+                var list = new StackPanel { Margin = new Thickness(0, 0, 0, 8) };
+                var number = 0;
 
                 foreach (var child in tag.Children)
                 {
@@ -95,13 +97,25 @@ internal static class BbCodeDocumentBuilder
                     if (child is BbText text && string.IsNullOrWhiteSpace(text.Text))
                         continue;
 
-                    var item = new ListItem();
+                    var item = new StackPanel();
                     var content = child is BbTag { Name: BbCodeParser.ListItemName } li ? li.Children : new List<BbNode> { child };
-                    RenderBlocks(content, item.Blocks, alignment);
-                    Tidy(item.Blocks);
-                    foreach (var block in item.Blocks)
+                    RenderBlocks(content, item.Children, alignment);
+                    Tidy(item.Children);
+                    foreach (var block in item.Children)
                         block.Margin = new Thickness(0, 0, 0, 2);
-                    list.ListItems.Add(item);
+
+                    var marker = new TextBlock
+                    {
+                        Text = ListMarker(tag.Argument, ++number),
+                        TextAlignment = TextAlignment.Right,
+                        Margin = new Thickness(0, 0, 6, 0)
+                    };
+                    var row = new Grid { ColumnDefinitions = new ColumnDefinitions("22,*") };
+                    Grid.SetColumn(marker, 0);
+                    Grid.SetColumn(item, 1);
+                    row.Children.Add(marker);
+                    row.Children.Add(item);
+                    list.Children.Add(row);
                 }
 
                 return list;
@@ -109,54 +123,61 @@ internal static class BbCodeDocumentBuilder
 
             case "quote":
             {
-                var section = new Section
+                var content = new StackPanel();
+                var section = new Border
                 {
                     Margin = new Thickness(0, 0, 0, 8),
                     Padding = new Thickness(12, 6, 8, 6),
-                    BorderThickness = new Thickness(3, 0, 0, 0)
+                    BorderThickness = new Thickness(3, 0, 0, 0),
+                    Child = content
                 };
-                section.SetResourceReference(Block.BorderBrushProperty, "AccentBrush");
-                section.SetResourceReference(TextElement.BackgroundProperty, "CardBackgroundBrush");
+                UseResource(section, Border.BorderBrushProperty, "AccentBrush");
+                UseResource(section, Border.BackgroundProperty, "CardBackgroundBrush");
 
                 if (!string.IsNullOrWhiteSpace(tag.Argument))
                 {
-                    var author = new Paragraph(new Italic(new Run($"{tag.Argument} wrote:"))) { Margin = new Thickness(0, 0, 0, 4) };
-                    author.SetResourceReference(TextElement.ForegroundProperty, "SecondaryForegroundBrush");
-                    section.Blocks.Add(author);
+                    var author = NewParagraph(alignment);
+                    author.Margin = new Thickness(0, 0, 0, 4);
+                    author.Inlines!.Add(new Italic { Inlines = { new Run($"{tag.Argument} wrote:") } });
+                    UseResource(author, TextBlock.ForegroundProperty, "SecondaryForegroundBrush");
+                    content.Children.Add(author);
                 }
 
-                RenderBlocks(tag.Children, section.Blocks, alignment);
-                Tidy(section.Blocks);
+                RenderBlocks(tag.Children, content.Children, alignment);
+                Tidy(content.Children);
                 return section;
             }
 
             case "code" or "php" or "html":
             {
-                var code = new Paragraph
+                var code = new SelectableTextBlock
+                {
+                    FontSize = 12,
+                    TextWrapping = TextWrapping.Wrap,
+                    Text = Normalize(string.Concat(tag.Children.OfType<BbText>().Select(t => t.Text))).Trim('\n')
+                };
+                UseResource(code, TextBlock.FontFamilyProperty, "MonospaceFont");
+
+                var block = new Border
                 {
                     Margin = new Thickness(0, 0, 0, 8),
                     Padding = new Thickness(10, 8, 10, 8),
-                    FontFamily = new FontFamily("Cascadia Mono, Consolas, Courier New"),
-                    FontSize = 12,
-                    TextAlignment = TextAlignment.Left
+                    CornerRadius = new CornerRadius(4),
+                    Child = code
                 };
-                code.SetResourceReference(TextElement.BackgroundProperty, "ControlBackgroundBrush");
-                AddText(code.Inlines, string.Concat(tag.Children.OfType<BbText>().Select(t => t.Text)).Trim('\n'), decode: false);
-                return code;
+                UseResource(block, Border.BackgroundProperty, "ControlBackgroundBrush");
+                return block;
             }
 
             case "h1" or "h2" or "h3":
             {
-                var heading = new Paragraph
-                {
-                    Margin = new Thickness(0, 6, 0, 6),
-                    FontWeight = FontWeights.SemiBold,
-                    FontSize = tag.Name switch { "h1" => 22, "h2" => 18, _ => 15 },
-                    TextAlignment = alignment
-                };
-                heading.SetResourceReference(TextElement.FontFamilyProperty, "HeadingFont");
+                var heading = NewParagraph(alignment);
+                heading.Margin = new Thickness(0, 6, 0, 6);
+                heading.FontWeight = FontWeight.SemiBold;
+                heading.FontSize = tag.Name switch { "h1" => 22, "h2" => 18, _ => 15 };
+                UseResource(heading, TextBlock.FontFamilyProperty, "HeadingFont");
                 foreach (var child in tag.Children)
-                    RenderInline(child, heading.Inlines);
+                    RenderInline(child, heading.Inlines!, heading);
                 return heading;
             }
 
@@ -171,25 +192,72 @@ internal static class BbCodeDocumentBuilder
                     _ => alignment
                 };
 
-                var section = new Section
-                {
-                    Margin = new Thickness(tag.Name == "indent" ? 24 : 0, 0, 0, 0),
-                    TextAlignment = childAlignment
-                };
-                RenderBlocks(tag.Children, section.Blocks, childAlignment);
-                Tidy(section.Blocks);
+                var section = new StackPanel { Margin = new Thickness(tag.Name == "indent" ? 24 : 0, 0, 0, 0) };
+                RenderBlocks(tag.Children, section.Children, childAlignment);
+                Tidy(section.Children);
                 return section;
             }
         }
     }
 
+    private static BbParagraph NewParagraph(TextAlignment alignment) => new()
+    {
+        Margin = new Thickness(0, 0, 0, 8),
+        TextAlignment = alignment,
+        TextWrapping = TextWrapping.Wrap,
+        Inlines = new InlineCollection()
+    };
+
+    /// <summary>Bullet for [list], "1." / "a." / "i." for [list=1] / [list=a] / [list=i].</summary>
+    private static string ListMarker(string? style, int number) => style?.Trim().ToLowerInvariant() switch
+    {
+        "1" => $"{number}.",
+        "a" => $"{ToLatin(number)}.",
+        "i" => $"{ToRoman(number)}.",
+        _ => "•"
+    };
+
+    private static string ToLatin(int number)
+    {
+        var text = string.Empty;
+        while (number > 0)
+        {
+            number--;
+            text = (char)('a' + number % 26) + text;
+            number /= 26;
+        }
+
+        return text;
+    }
+
+    private static string ToRoman(int number)
+    {
+        ReadOnlySpan<(int Value, string Text)> numerals =
+        [
+            (1000, "m"), (900, "cm"), (500, "d"), (400, "cd"), (100, "c"), (90, "xc"),
+            (50, "l"), (40, "xl"), (10, "x"), (9, "ix"), (5, "v"), (4, "iv"), (1, "i")
+        ];
+
+        var text = new System.Text.StringBuilder();
+        foreach (var (value, numeral) in numerals)
+        {
+            while (number >= value)
+            {
+                text.Append(numeral);
+                number -= value;
+            }
+        }
+
+        return text.ToString();
+    }
+
     // ===== Inlines =====
 
-    private static void RenderInline(BbNode node, InlineCollection inlines)
+    private void RenderInline(BbNode node, InlineCollection inlines, BbParagraph paragraph)
     {
         if (node is BbText text)
         {
-            AddText(inlines, text.Text, decode: true);
+            AddText(inlines, text.Text);
             return;
         }
 
@@ -197,23 +265,23 @@ internal static class BbCodeDocumentBuilder
         switch (tag.Name)
         {
             case "b":
-                inlines.Add(Wrap(new Bold(), tag));
+                inlines.Add(Wrap(new Bold(), tag, paragraph));
                 break;
             case "i":
-                inlines.Add(Wrap(new Italic(), tag));
+                inlines.Add(Wrap(new Italic(), tag, paragraph));
                 break;
             case "u":
-                inlines.Add(Wrap(new Underline(), tag));
+                inlines.Add(Wrap(new Underline(), tag, paragraph));
                 break;
             case "s":
-                inlines.Add(Wrap(new Span { TextDecorations = TextDecorations.Strikethrough }, tag));
+                inlines.Add(Wrap(new Span { TextDecorations = TextDecorations.Strikethrough }, tag, paragraph));
                 break;
             case "color":
             {
                 var span = new Span();
                 if (TryParseBrush(tag.Argument) is { } brush)
                     span.Foreground = brush;
-                inlines.Add(Wrap(span, tag));
+                inlines.Add(Wrap(span, tag, paragraph));
                 break;
             }
             case "size":
@@ -221,57 +289,57 @@ internal static class BbCodeDocumentBuilder
                 var span = new Span();
                 if (ParseFontSize(tag.Argument) is { } size)
                     span.FontSize = size;
-                inlines.Add(Wrap(span, tag));
+                inlines.Add(Wrap(span, tag, paragraph));
                 break;
             }
             case "font":
             {
                 var span = new Span();
+                // Missing fonts fall back to the default font.
                 if (!string.IsNullOrWhiteSpace(tag.Argument))
-                    span.FontFamily = new FontFamily(tag.Argument + ", Segoe UI");
-                inlines.Add(Wrap(span, tag));
+                    span.FontFamily = new FontFamily(tag.Argument.Trim());
+                inlines.Add(Wrap(span, tag, paragraph));
                 break;
             }
             case "highlight":
             {
                 var span = new Span();
-                span.SetResourceReference(TextElement.BackgroundProperty, "AccentSubtleBackgroundBrush");
-                inlines.Add(Wrap(span, tag));
+                UseResource(span, Inline.BackgroundProperty, "AccentSubtleBackgroundBrush");
+                inlines.Add(Wrap(span, tag, paragraph));
                 break;
             }
             case "url" or "email" or "video" or "youtube":
-                inlines.Add(CreateLink(tag));
+                inlines.Add(CreateLink(tag, paragraph));
                 break;
             case "img":
-                if (CreateImage(PlainText(tag)) is { } image)
+                if (CreateImage(PlainText(tag), paragraph) is { } image)
                     inlines.Add(image);
                 break;
             case BbCodeParser.ListItemName:
-                inlines.Add(new LineBreak());
-                inlines.Add(new Run("• "));
+                inlines.Add(new Run("\n• "));
                 foreach (var child in tag.Children)
-                    RenderInline(child, inlines);
+                    RenderInline(child, inlines, paragraph);
                 break;
             default:
                 // Block tags nested in inline formatting (e.g. "[b][list]...") are flattened onto their own lines.
                 if (BlockTags.Contains(tag.Name))
-                    inlines.Add(new LineBreak());
+                    inlines.Add(new Run("\n"));
                 foreach (var child in tag.Children)
-                    RenderInline(child, inlines);
+                    RenderInline(child, inlines, paragraph);
                 if (BlockTags.Contains(tag.Name))
-                    inlines.Add(new LineBreak());
+                    inlines.Add(new Run("\n"));
                 break;
         }
     }
 
-    private static Span Wrap(Span span, BbTag tag)
+    private Span Wrap(Span span, BbTag tag, BbParagraph paragraph)
     {
         foreach (var child in tag.Children)
-            RenderInline(child, span.Inlines);
+            RenderInline(child, span.Inlines, paragraph);
         return span;
     }
 
-    private static Inline CreateLink(BbTag tag)
+    private Inline CreateLink(BbTag tag, BbParagraph paragraph)
     {
         var display = PlainText(tag).Trim();
         var target = string.IsNullOrWhiteSpace(tag.Argument) ? display : tag.Argument.Trim();
@@ -281,70 +349,64 @@ internal static class BbCodeDocumentBuilder
             target = "https://" + target;
 
         if (!Uri.TryCreate(target, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https" or "mailto"))
-            return Wrap(new Span(), tag);
+            return Wrap(new Span(), tag, paragraph);
 
-        var link = new Hyperlink { NavigateUri = uri, ToolTip = uri.AbsoluteUri };
-        link.RequestNavigate += (_, e) =>
-        {
-            OpenInBrowser(e.Uri);
-            e.Handled = true;
-        };
+        var link = new Span();
+        UseResource(link, Inline.ForegroundProperty, "AccentBrush");
 
         if (string.IsNullOrEmpty(display) || tag.Children.Count == 0)
             link.Inlines.Add(new Run(uri.AbsoluteUri));
         else
             foreach (var child in tag.Children)
-                RenderInline(child, link.Inlines);
+                RenderInline(child, link.Inlines, paragraph);
 
+        paragraph.AddLink(link, uri);
         return link;
     }
 
-    private static InlineUIContainer? CreateImage(string url)
+    /// <summary>An inline picture, downloaded in the background (and cached) by <see cref="IImageCache"/>.</summary>
+    private static InlineUIContainer? CreateImage(string url, BbParagraph paragraph)
     {
         if (!Uri.TryCreate(url.Trim(), UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https"))
             return null;
 
-        try
+        var image = new Image
         {
-            // WPF downloads http(s) images itself, in the background.
-            var source = new BitmapImage();
-            source.BeginInit();
-            source.UriSource = uri;
-            source.CacheOption = BitmapCacheOption.OnLoad;
-            source.CreateOptions = BitmapCreateOptions.IgnoreColorProfile;
-            source.EndInit();
-
-            var image = new Image
-            {
-                Source = source,
-                Stretch = Stretch.Uniform,
-                StretchDirection = StretchDirection.DownOnly,
-                MaxWidth = 560,
-                MaxHeight = 420,
-                Margin = new Thickness(0, 4, 0, 4)
-            };
-            return new InlineUIContainer(image) { BaselineAlignment = BaselineAlignment.Bottom };
-        }
-        catch (Exception ex) when (ex is UriFormatException or NotSupportedException or ArgumentException)
-        {
-            return null;
-        }
+            Stretch = Stretch.Uniform,
+            StretchDirection = StretchDirection.DownOnly,
+            MaxWidth = MaxImageWidth,
+            MaxHeight = MaxImageHeight,
+            Margin = new Thickness(0, 4, 0, 4),
+            VerticalAlignment = VerticalAlignment.Bottom
+        };
+        _ = LoadImageAsync(image, uri, paragraph);
+        return new InlineUIContainer(image);
     }
 
-    private static void AddText(InlineCollection inlines, string text, bool decode)
+    private static async Task LoadImageAsync(Image image, Uri uri, BbParagraph paragraph)
     {
-        if (decode)
-            text = WebUtility.HtmlDecode(text);
+        var bitmap = await App.Services.GetRequiredService<IImageCache>().GetAsync(uri.AbsoluteUri, 0);
+        if (bitmap is null)
+            return;
 
-        var lines = text.Split('\n');
-        for (var i = 0; i < lines.Length; i++)
-        {
-            if (i > 0)
-                inlines.Add(new LineBreak());
-            if (lines[i].Length > 0)
-                inlines.Add(new Run(lines[i]));
-        }
+        // Sized explicitly so the paragraph can lay the picture out (scaled down, never up).
+        var size = bitmap.Size;
+        var scale = Math.Min(1, Math.Min(MaxImageWidth / Math.Max(size.Width, 1), MaxImageHeight / Math.Max(size.Height, 1)));
+        image.Width = size.Width * scale;
+        image.Height = size.Height * scale;
+        image.Source = bitmap;
+        paragraph.Refresh();
     }
+
+    private static void AddText(InlineCollection inlines, string text)
+    {
+        // Line breaks stay inside the runs, so the paragraph's text offsets match the runs (see BbParagraph).
+        text = Normalize(WebUtility.HtmlDecode(text));
+        if (text.Length > 0)
+            inlines.Add(new Run(text));
+    }
+
+    private static string Normalize(string text) => text.Replace("\r\n", "\n").Replace('\r', '\n');
 
     private static string PlainText(BbNode node) => node switch
     {
@@ -354,45 +416,56 @@ internal static class BbCodeDocumentBuilder
     };
 
     /// <summary>Removes line breaks at the start and end of paragraphs and drops paragraphs left empty.</summary>
-    private static void Tidy(BlockCollection blocks)
+    private static void Tidy(Avalonia.Controls.Controls blocks)
     {
-        foreach (var paragraph in blocks.OfType<Paragraph>().ToList())
+        foreach (var paragraph in blocks.OfType<BbParagraph>().ToList())
         {
-            while (paragraph.Inlines.FirstInline is LineBreak first)
-                paragraph.Inlines.Remove(first);
-            while (paragraph.Inlines.LastInline is LineBreak last)
-                paragraph.Inlines.Remove(last);
-            while (paragraph.Inlines.FirstInline is Run { Text: var t } run && string.IsNullOrWhiteSpace(t) && paragraph.Inlines.Count > 1)
+            var inlines = paragraph.Inlines!;
+
+            // Leading line breaks and whitespace-only lines.
+            while (inlines.Count > 0 && inlines[0] is Run first)
             {
-                paragraph.Inlines.Remove(run);
-                while (paragraph.Inlines.FirstInline is LineBreak lb)
-                    paragraph.Inlines.Remove(lb);
+                var trimmed = (first.Text ?? string.Empty).TrimStart('\n');
+                if (string.IsNullOrWhiteSpace(trimmed) && inlines.Count > 1)
+                {
+                    inlines.RemoveAt(0);
+                    continue;
+                }
+
+                first.Text = trimmed;
+                break;
             }
 
-            if (paragraph.Inlines.Count == 0 || paragraph.Inlines.All(i => i is Run { Text: var s } && string.IsNullOrWhiteSpace(s)))
+            // Trailing line breaks.
+            while (inlines.Count > 0 && inlines[^1] is Run last)
+            {
+                var trimmed = (last.Text ?? string.Empty).TrimEnd('\n');
+                if (trimmed.Length == 0)
+                {
+                    inlines.RemoveAt(inlines.Count - 1);
+                    continue;
+                }
+
+                last.Text = trimmed;
+                break;
+            }
+
+            if (inlines.Count == 0 || inlines.All(i => i is Run { Text: var s } && string.IsNullOrWhiteSpace(s)))
                 blocks.Remove(paragraph);
         }
     }
 
-    private static Brush? TryParseBrush(string? value)
+    /// <summary>Binds <paramref name="property"/> to a resource of the host, so it follows theme changes.</summary>
+    private void UseResource(AvaloniaObject target, AvaloniaProperty property, string key) =>
+        target.Bind(property, _host.GetResourceObservable(key));
+
+    private static IBrush? TryParseBrush(string? value)
     {
-        if (string.IsNullOrWhiteSpace(value))
+        // Named colors (red, gold...) and #rgb / #rrggbb; unknown values are ignored, like browsers do.
+        if (string.IsNullOrWhiteSpace(value) || !Color.TryParse(value.Trim(), out var color))
             return null;
 
-        try
-        {
-            if (new BrushConverter().ConvertFromInvariantString(value.Trim()) is Brush brush)
-            {
-                brush.Freeze();
-                return brush;
-            }
-        }
-        catch (Exception ex) when (ex is FormatException or NotSupportedException or ArgumentException)
-        {
-            // Unknown color names are ignored, like browsers do.
-        }
-
-        return null;
+        return new ImmutableSolidColorBrush(color);
     }
 
     private static double? ParseFontSize(string? value)
@@ -416,6 +489,7 @@ internal static class BbCodeDocumentBuilder
 
         try
         {
+            // Shell execute opens the default browser / mail app on every platform (xdg-open on Linux, open on macOS).
             Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
         }
         catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)

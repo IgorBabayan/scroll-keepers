@@ -1,0 +1,210 @@
+<controls:ChromeWindow xmlns="https://github.com/avaloniaui"
+                      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                      xmlns:controls="using:ScrollKeeper.Presentation.Controls"
+                      xmlns:addons="using:ScrollKeeper.Presentation.ViewModels.Addons"
+                      xmlns:documents="using:ScrollKeeper.Presentation.Documents"
+                      xmlns:toastViews="using:ScrollKeeper.Presentation.Views.Toasts"
+                      x:Class="ScrollKeeper.Presentation.Views.Addons.AddonDetailsWindow"
+                      Title="{Binding Title}"
+                      Width="920"
+                      Height="680"
+                      MinWidth="640"
+                      MinHeight="420"
+                      ShowInTaskbar="False"
+                      WindowStartupLocation="CenterOwner"
+                      FontFamily="{StaticResource BodyFont}"
+                      Background="{DynamicResource WindowBackgroundBrush}"
+                      Foreground="{DynamicResource WindowForegroundBrush}">
+
+    <Border x:Name="RootBorder" BorderBrush="{DynamicResource WindowBorderBrush}" BorderThickness="1">
+        <Grid RowDefinitions="32,Auto,*">
+
+            <!-- ===== Title bar ===== -->
+            <Border x:Name="TitleBar"
+                    Grid.Row="0"
+                    Padding="{x:Static controls:PlatformChrome.TitleBarPadding}"
+                    Background="{DynamicResource TitleBarBackgroundBrush}">
+                <Panel>
+                    <TextBlock x:Name="TitleText"
+                               Margin="12,0,56,0"
+                               VerticalAlignment="Center"
+                               FontSize="12"
+                               TextTrimming="CharacterEllipsis"
+                               Text="{Binding $parent[Window].Title}" />
+                    <Button HorizontalAlignment="Right"
+                            Theme="{StaticResource CloseCaptionButton}"
+                            ToolTip.Tip="Close (Esc)"
+                            AutomationProperties.Name="Close"
+                            Click="OnCloseClick"
+                            IsVisible="{x:Static controls:PlatformChrome.HasCaptionButtons}">
+                        <controls:Icon IconSize="11" StrokeThickness="1.6" Data="{StaticResource CloseGeometry}" />
+                    </Button>
+                </Panel>
+            </Border>
+
+            <!-- ===== Header: icon, name, author, Install / Update ===== -->
+            <Grid Grid.Row="1" Margin="24,20,24,12" ColumnDefinitions="64,*,Auto">
+
+                <ContentControl Grid.Column="0"
+                                Width="64"
+                                Height="64"
+                                VerticalAlignment="Top"
+                                Content="{Binding Item}"
+                                ContentTemplate="{StaticResource AddonIconTemplate}" />
+
+                <StackPanel Grid.Column="1" Margin="16,0,16,0" VerticalAlignment="Center">
+                    <TextBlock FontFamily="{StaticResource HeadingFont}"
+                               FontSize="24"
+                               TextWrapping="Wrap"
+                               Text="{Binding Item.Name}" />
+                    <TextBlock Margin="0,4,0,0"
+                               FontSize="13"
+                               Foreground="{DynamicResource SecondaryForegroundBrush}"
+                               TextTrimming="CharacterEllipsis"
+                               Text="{Binding Item.Byline}" />
+                    <TextBlock Margin="0,2,0,0"
+                               FontSize="12"
+                               Foreground="{DynamicResource SecondaryForegroundBrush}"
+                               TextTrimming="CharacterEllipsis"
+                               Text="{Binding Item.Details}" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                    <ContentControl HorizontalAlignment="Right"
+                                    Content="{Binding Item}"
+                                    ContentTemplate="{StaticResource AddonActionTemplate}" />
+                    <Button Margin="0,6,-8,0"
+                            HorizontalAlignment="Right"
+                            Theme="{StaticResource TextLinkButton}"
+                            Command="{Binding OpenWebPageCommand}"
+                            IsVisible="{Binding IsOnEsoui}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Open on ESOUI" />
+                            <controls:Icon Margin="6,0,0,0"
+                                           VerticalAlignment="Center"
+                                           IconSize="12"
+                                           Data="{StaticResource OpenExternalGeometry}" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </Grid>
+
+            <!-- ===== Body: page (left) | information (right) ===== -->
+            <Grid Grid.Row="2" Margin="24,0,24,20" ColumnDefinitions="*,260">
+
+                <Grid Grid.Column="0" RowDefinitions="Auto,Auto,*">
+
+                    <ProgressBar Grid.Row="0"
+                                 Height="3"
+                                 Margin="0,0,0,8"
+                                 IsIndeterminate="True"
+                                 AutomationProperties.Name="Loading the addon page"
+                                 IsVisible="{Binding IsLoading}" />
+
+                    <StackPanel Grid.Row="1">
+                        <TextBlock Margin="0,0,0,8"
+                                   FontSize="12"
+                                   TextWrapping="Wrap"
+                                   Foreground="{DynamicResource ErrorForegroundBrush}"
+                                   Text="{Binding Error}"
+                                   IsVisible="{Binding HasError}" />
+                        <TextBlock Margin="0,0,0,8"
+                                   FontSize="12"
+                                   TextWrapping="Wrap"
+                                   Foreground="{DynamicResource WarningForegroundBrush}"
+                                   Text="A new version of this addon is waiting for approval by the ESOUI staff."
+                                   IsVisible="{Binding IsPending}" />
+                    </StackPanel>
+
+                    <TabControl Grid.Row="2" Theme="{StaticResource PillTabControl}">
+                        <TabItem Header="Description">
+                            <ScrollViewer Margin="0,12,0,0"
+                                          VerticalScrollBarVisibility="Auto"
+                                          HorizontalScrollBarVisibility="Disabled">
+                                <documents:BbCodeView Margin="0,0,14,0" TextElement.FontSize="13" Text="{Binding Description}" />
+                            </ScrollViewer>
+                        </TabItem>
+                        <TabItem Header="Change log" IsVisible="{Binding HasChangeLog}">
+                            <ScrollViewer Margin="0,12,0,0"
+                                          VerticalScrollBarVisibility="Auto"
+                                          HorizontalScrollBarVisibility="Disabled">
+                                <documents:BbCodeView Margin="0,0,14,0" TextElement.FontSize="13" Text="{Binding ChangeLog}" />
+                            </ScrollViewer>
+                        </TabItem>
+                        <TabItem Header="Pictures" IsVisible="{Binding HasScreenshots}">
+                            <ScrollViewer Margin="0,12,0,0"
+                                          VerticalScrollBarVisibility="Auto"
+                                          HorizontalScrollBarVisibility="Disabled">
+                                <ItemsControl ItemsSource="{Binding Screenshots}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate DataType="addons:ScreenshotViewModel">
+                                            <Button Width="180"
+                                                    Height="120"
+                                                    Margin="0,0,10,10"
+                                                    Padding="0"
+                                                    Theme="{StaticResource ListRowButton}"
+                                                    ToolTip.Tip="Open the full picture"
+                                                    Command="{Binding $parent[ItemsControl].DataContext.OpenScreenshotCommand}"
+                                                    CommandParameter="{Binding}">
+                                                <Panel>
+                                                    <Border CornerRadius="6" Background="{DynamicResource CardBackgroundBrush}" />
+                                                    <!-- Rounded corners: the border clips the picture. -->
+                                                    <Border CornerRadius="6" ClipToBounds="True">
+                                                        <Image Source="{Binding Image}"
+                                                               Stretch="UniformToFill"
+                                                               RenderOptions.BitmapInterpolationMode="HighQuality" />
+                                                    </Border>
+                                                    <Border CornerRadius="6"
+                                                            BorderThickness="1"
+                                                            BorderBrush="{DynamicResource WindowBorderBrush}"
+                                                            IsHitTestVisible="False" />
+                                                </Panel>
+                                            </Button>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </TabItem>
+                    </TabControl>
+                </Grid>
+
+                <!-- Information -->
+                <Border Grid.Column="1"
+                        Margin="20,0,0,0"
+                        Padding="16,14"
+                        VerticalAlignment="Top"
+                        CornerRadius="10"
+                        BorderThickness="1"
+                        BorderBrush="{DynamicResource WindowBorderBrush}"
+                        Background="{DynamicResource CardBackgroundBrush}">
+                    <StackPanel>
+                        <TextBlock Theme="{StaticResource SectionHeaderText}" Text="Information" />
+                        <ItemsControl Margin="0,8,0,0" ItemsSource="{Binding Facts}" Focusable="False">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Margin="0,0,0,10">
+                                        <TextBlock FontSize="11"
+                                                   Foreground="{DynamicResource SecondaryForegroundBrush}"
+                                                   Text="{Binding Key}" />
+                                        <SelectableTextBlock Margin="0,1,0,0"
+                                                             FontSize="13"
+                                                             TextWrapping="Wrap"
+                                                             Text="{Binding Value}" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- ===== Toasts (bottom-right, above the content) ===== -->
+            <toastViews:ToastHost Grid.Row="2" ZIndex="10" />
+        </Grid>
+    </Border>
+</controls:ChromeWindow>

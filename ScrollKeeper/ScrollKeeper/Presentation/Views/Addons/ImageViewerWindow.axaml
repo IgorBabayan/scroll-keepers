@@ -1,0 +1,113 @@
+<controls:ChromeWindow xmlns="https://github.com/avaloniaui"
+                      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                      xmlns:controls="using:ScrollKeeper.Presentation.Controls"
+                      x:Class="ScrollKeeper.Presentation.Views.Addons.ImageViewerWindow"
+                      Title="{Binding Title}"
+                      Width="1100"
+                      Height="760"
+                      MinWidth="480"
+                      MinHeight="360"
+                      ShowInTaskbar="False"
+                      WindowStartupLocation="CenterOwner"
+                      FontFamily="{StaticResource BodyFont}"
+                      Background="{DynamicResource WindowBackgroundBrush}"
+                      Foreground="{DynamicResource WindowForegroundBrush}">
+
+    <Border x:Name="RootBorder" BorderBrush="{DynamicResource WindowBorderBrush}" BorderThickness="1">
+        <Grid RowDefinitions="32,*,Auto">
+
+            <!-- ===== Title bar ===== -->
+            <Border x:Name="TitleBar"
+                    Grid.Row="0"
+                    Padding="{x:Static controls:PlatformChrome.TitleBarPadding}"
+                    Background="{DynamicResource TitleBarBackgroundBrush}">
+                <Panel>
+                    <TextBlock x:Name="TitleText"
+                               Margin="12,0,100,0"
+                               VerticalAlignment="Center"
+                               FontSize="12"
+                               TextTrimming="CharacterEllipsis"
+                               Text="{Binding $parent[Window].Title}" />
+                    <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
+                        <Button Theme="{StaticResource TitleBarToolButton}"
+                                ToolTip.Tip="Open in browser"
+                                AutomationProperties.Name="Open in browser"
+                                Command="{Binding OpenInBrowserCommand}">
+                            <controls:Icon IconSize="15" Data="{StaticResource OpenExternalGeometry}" />
+                        </Button>
+                        <Button Theme="{StaticResource CloseCaptionButton}"
+                                ToolTip.Tip="Close (Esc)"
+                                AutomationProperties.Name="Close"
+                                Click="OnCloseClick"
+                                IsVisible="{x:Static controls:PlatformChrome.HasCaptionButtons}">
+                            <controls:Icon IconSize="11" StrokeThickness="1.6" Data="{StaticResource CloseGeometry}" />
+                        </Button>
+                    </StackPanel>
+                </Panel>
+            </Border>
+
+            <!-- ===== Picture ===== -->
+            <Grid Grid.Row="1" Margin="16">
+                <Image Source="{Binding Image}"
+                       Stretch="Uniform"
+                       StretchDirection="DownOnly"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"
+                       RenderOptions.BitmapInterpolationMode="HighQuality" />
+
+                <StackPanel HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            IsVisible="{Binding HasError}">
+                    <TextBlock Theme="{StaticResource SecondaryText}"
+                               HorizontalAlignment="Center"
+                               Text="Could not load the full picture." />
+                    <Button Margin="0,8,0,0"
+                            HorizontalAlignment="Center"
+                            Theme="{StaticResource TextLinkButton}"
+                            Content="Open in browser"
+                            Command="{Binding OpenInBrowserCommand}" />
+                </StackPanel>
+
+                <Button HorizontalAlignment="Left"
+                        VerticalAlignment="Center"
+                        Width="40"
+                        Height="40"
+                        Focusable="False"
+                        Theme="{StaticResource IconButton}"
+                        ToolTip.Tip="Previous (&#x2190;)"
+                        AutomationProperties.Name="Previous picture"
+                        IsVisible="{Binding HasMany}"
+                        Command="{Binding PreviousCommand}">
+                    <controls:Icon IconSize="18" Data="{StaticResource ChevronLeftGeometry}" />
+                </Button>
+
+                <Button HorizontalAlignment="Right"
+                        VerticalAlignment="Center"
+                        Width="40"
+                        Height="40"
+                        Focusable="False"
+                        Theme="{StaticResource IconButton}"
+                        ToolTip.Tip="Next (&#x2192;)"
+                        AutomationProperties.Name="Next picture"
+                        IsVisible="{Binding HasMany}"
+                        Command="{Binding NextCommand}">
+                    <controls:Icon IconSize="18" Data="{StaticResource ChevronRightGeometry}" />
+                </Button>
+            </Grid>
+
+            <!-- ===== Footer: position and loading state ===== -->
+            <StackPanel Grid.Row="2"
+                        Margin="0,0,0,12"
+                        HorizontalAlignment="Center"
+                        Orientation="Horizontal">
+                <TextBlock Theme="{StaticResource SecondaryText}"
+                           IsVisible="{Binding HasMany}"
+                           Text="{Binding Position}" />
+                <TextBlock Margin="12,0,0,0"
+                           Theme="{StaticResource SecondaryText}"
+                           IsVisible="{Binding IsLoading}"
+                           Text="Loading full picture&#x2026;" />
+            </StackPanel>
+        </Grid>
+    </Border>
+</controls:ChromeWindow>

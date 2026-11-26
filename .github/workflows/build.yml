@@ -1,7 +1,7 @@
 name: Build
 
-# Manual compile check only (Actions tab -> Build -> Run workflow).
-# Pushes to `development` no longer trigger a build; the installer is built when `release` changes
+# Manual compile check only (Actions tab -> Build -> Run workflow), on Windows, Linux and macOS.
+# Pushes to `development` no longer trigger a build; the installers are built when `release` changes
 # (see release-installer.yml).
 on:
   workflow_dispatch:
@@ -15,7 +15,11 @@ concurrency:
 
 jobs:
   build:
-    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 

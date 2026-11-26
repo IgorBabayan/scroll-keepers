@@ -1,5 +1,5 @@
 using System.Globalization;
-using System.Windows.Media;
+using Avalonia.Media.Imaging;
 using ScrollKeeper.Services.Addons;
 using ScrollKeeper.Services.Catalog;
 using ScrollKeeper.Services.Images;
@@ -18,8 +18,15 @@ public sealed partial class AddonItemViewModel : ViewModelBase
     private readonly IAddonActions _actions;
     private readonly IImageCache _images;
 
-    private ImageSource? _icon;
+    /// <summary>
+    /// Held weakly: one view model exists per ESOUI addon (thousands), so strong references would keep every icon
+    /// ever scrolled past in memory. A row on screen keeps its picture alive; one scrolled away can be collected
+    /// and is reloaded (from the image cache) the next time it is shown.
+    /// </summary>
+    private WeakReference<Bitmap>? _icon;
     private string? _requestedIconUrl;
+    /// <summary>The picture being loaded right now, if any.</summary>
+    private string? _loadingIconUrl;
 
     public AddonItemViewModel(string key, IAddonActions actions, IImageCache images)
     {
@@ -123,22 +130,26 @@ public sealed partial class AddonItemViewModel : ViewModelBase
     private string? FullIconUrl => Catalog is { Thumbnails.Count: > 0 } catalog ? catalog.Images.FirstOrDefault() : null;
 
     /// <summary>Loaded on first use, so only rows scrolled into view download their icon.</summary>
-    public ImageSource? Icon
+    public Bitmap? Icon
     {
         get
         {
             var url = IconUrl;
-            if (url is not null && url != _requestedIconUrl)
+            var icon = CurrentIcon;
+            // A new picture, or the old one was collected while the row was off screen.
+            if (url is not null && url != _loadingIconUrl && (url != _requestedIconUrl || icon is null))
             {
                 _requestedIconUrl = url;
                 _ = LoadIconAsync(url);
             }
 
-            return _icon;
+            return icon;
         }
     }
 
-    public bool HasIcon => _icon is not null;
+    public bool HasIcon => CurrentIcon is not null;
+
+    private Bitmap? CurrentIcon => _icon is not null && _icon.TryGetTarget(out var icon) ? icon : null;
 
     // ===== State =====
 
@@ -246,26 +257,34 @@ public sealed partial class AddonItemViewModel : ViewModelBase
     private async Task LoadIconAsync(string url)
     {
         var fullUrl = FullIconUrl;
+        _loadingIconUrl = url;
+        try
+        {
+            // The small thumbnail arrives quickly and fills the gap while the full picture downloads.
+            var thumbnail = await _images.GetAsync(url, IconDecodeSize);
+            // The addon may have changed (catalog refresh) while the image was downloading.
+            if (url != IconUrl)
+                return;
+            if (thumbnail is not null)
+                SetIcon(thumbnail);
 
-        // The small thumbnail arrives quickly and fills the gap while the full picture downloads.
-        var thumbnail = await _images.GetAsync(url, IconDecodeSize);
-        // The addon may have changed (catalog refresh) while the image was downloading.
-        if (url != IconUrl)
-            return;
-        if (thumbnail is not null)
-            SetIcon(thumbnail);
+            if (string.IsNullOrWhiteSpace(fullUrl) || fullUrl == url)
+                return;
 
-        if (string.IsNullOrWhiteSpace(fullUrl) || fullUrl == url)
-            return;
-
-        var full = await _images.GetAsync(fullUrl, IconDecodeSize);
-        if (full is not null && url == IconUrl)
-            SetIcon(full);
+            var full = await _images.GetAsync(fullUrl, IconDecodeSize);
+            if (full is not null && url == IconUrl)
+                SetIcon(full);
+        }
+        finally
+        {
+            if (_loadingIconUrl == url)
+                _loadingIconUrl = null;
+        }
     }
 
-    private void SetIcon(ImageSource image)
+    private void SetIcon(Bitmap image)
     {
-        _icon = image;
+        _icon = new WeakReference<Bitmap>(image);
         OnPropertyChanged(nameof(Icon));
         OnPropertyChanged(nameof(HasIcon));
     }

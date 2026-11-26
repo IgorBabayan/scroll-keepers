@@ -1,11 +1,11 @@
-using System.IO;
-using System.Windows;
+using Avalonia.Interactivity;
+using ScrollKeeper.Presentation.Controls;
 using ScrollKeeper.Services.Addons;
 
 namespace ScrollKeeper.Presentation.Views.Addons;
 
 /// <summary>Lists what removing an addon deletes (folders, unused libraries, settings) and asks for confirmation.</summary>
-public partial class ConfirmRemoveWindow : Window
+public partial class ConfirmRemoveWindow : ChromeWindow
 {
     public ConfirmRemoveWindow(string addonName, RemovalPlan plan)
     {
@@ -51,9 +51,10 @@ public partial class ConfirmRemoveWindow : Window
         return sections;
     }
 
-    private void OnRemove(object sender, RoutedEventArgs e) => DialogResult = true;
+    private void OnRemove(object? sender, RoutedEventArgs e) => Close(true);
 
-    private void OnCancel(object sender, RoutedEventArgs e) => DialogResult = false;
+    /// <summary>Cancel, Esc (the Cancel button is IsCancel) and the × button.</summary>
+    private void OnCancel(object? sender, RoutedEventArgs e) => Close(false);
 }
 
 /// <summary>One group of the confirmation list.</summary>

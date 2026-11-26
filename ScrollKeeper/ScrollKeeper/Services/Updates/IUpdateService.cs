@@ -8,7 +8,7 @@ public interface IUpdateService
 
     /// <summary>
     /// True when the app runs from an installed copy (the Inno Setup uninstaller sits next to the exe).
-    /// Updates are never applied to development builds or unpacked copies.
+    /// Updates are never applied to development builds or unpacked copies, nor on Linux and macOS.
     /// </summary>
     bool IsInstalled { get; }
 

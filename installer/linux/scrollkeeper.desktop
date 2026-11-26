@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Scroll Keeper
+Comment=Keeps your Elder Scrolls Online addons organized and updated
+Exec=ScrollKeeper
+Icon=scrollkeeper
+Terminal=false
+Categories=Game;Utility;
+StartupWMClass=ScrollKeeper

@@ -1,0 +1,182 @@
+<controls:ChromeWindow xmlns="https://github.com/avaloniaui"
+                      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                      xmlns:controls="using:ScrollKeeper.Presentation.Controls"
+                      xmlns:behaviors="using:ScrollKeeper.Presentation.Behaviors"
+                      xmlns:toastViews="using:ScrollKeeper.Presentation.Views.Toasts"
+                      x:Class="ScrollKeeper.Presentation.Views.Settings.SettingsWindow"
+                      Title="Settings"
+                      Width="560"
+                      SizeToContent="Height"
+                      CanResize="False"
+                      ShowInTaskbar="False"
+                      WindowStartupLocation="CenterOwner"
+                      FontFamily="{StaticResource BodyFont}"
+                      Background="{DynamicResource WindowBackgroundBrush}"
+                      Foreground="{DynamicResource WindowForegroundBrush}">
+
+    <Border x:Name="RootBorder" BorderBrush="{DynamicResource WindowBorderBrush}" BorderThickness="1">
+        <Grid RowDefinitions="32,*,Auto">
+
+            <!-- ===== Title bar ===== -->
+            <Border x:Name="TitleBar"
+                    Grid.Row="0"
+                    Padding="{x:Static controls:PlatformChrome.TitleBarPadding}"
+                    Background="{DynamicResource TitleBarBackgroundBrush}">
+                <Panel>
+                    <TextBlock x:Name="TitleText"
+                               Margin="12,0,0,0"
+                               VerticalAlignment="Center"
+                               FontSize="12"
+                               Text="{Binding $parent[Window].Title}" />
+                    <Button HorizontalAlignment="Right"
+                            Theme="{StaticResource CloseCaptionButton}"
+                            ToolTip.Tip="Close"
+                            Command="{Binding CancelCommand}"
+                            IsVisible="{x:Static controls:PlatformChrome.HasCaptionButtons}">
+                        <controls:Icon IconSize="11" StrokeThickness="1.6" Data="{StaticResource CloseGeometry}" />
+                    </Button>
+                </Panel>
+            </Border>
+
+            <!-- ===== Content ===== -->
+            <StackPanel Grid.Row="1" Margin="20,16,20,20">
+
+                <!-- AddOns folder -->
+                <TextBlock Theme="{StaticResource SectionHeaderText}" Text="AddOns folder" />
+                <TextBlock Theme="{StaticResource SecondaryText}"
+                           Margin="0,2,0,8"
+                           Text="{Binding AddonsFolderHint}" />
+
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBox Grid.Column="0"
+                             Text="{Binding AddonsFolderPath}"
+                             AutomationProperties.Name="AddOns folder" />
+                    <Button Grid.Column="1"
+                            Margin="8,0,0,0"
+                            Theme="{StaticResource IconButton}"
+                            ToolTip.Tip="Select folder"
+                            AutomationProperties.Name="Select AddOns folder"
+                            Command="{Binding SelectFolderCommand}">
+                        <controls:Icon IconSize="17" Data="{StaticResource FolderGeometry}" />
+                    </Button>
+                </Grid>
+
+                <DockPanel Margin="0,6,0,0" LastChildFill="False">
+                    <TextBlock DockPanel.Dock="Left"
+                               VerticalAlignment="Center"
+                               FontSize="12"
+                               TextWrapping="Wrap"
+                               Foreground="{DynamicResource WarningForegroundBrush}"
+                               Text="This folder does not exist."
+                               IsVisible="{Binding IsAddonsFolderMissing}" />
+                    <TextBlock DockPanel.Dock="Left"
+                               VerticalAlignment="Center"
+                               FontSize="12"
+                               TextWrapping="Wrap"
+                               Foreground="{DynamicResource WarningForegroundBrush}"
+                               Text="This does not look like an AddOns folder."
+                               IsVisible="{Binding LooksLikeWrongFolder}" />
+                    <Button DockPanel.Dock="Right"
+                            Margin="0,0,-8,0"
+                            Theme="{StaticResource TextLinkButton}"
+                            Content="Use default folder"
+                            Command="{Binding ResetFolderCommand}" />
+                </DockPanel>
+
+                <!-- Updates -->
+                <TextBlock Theme="{StaticResource SectionHeaderText}" Margin="0,16,0,0" Text="Updates" />
+                <TextBlock Theme="{StaticResource SecondaryText}"
+                           Margin="0,2,0,8"
+                           Text="{Binding CurrentVersionText}" />
+
+                <DockPanel LastChildFill="False">
+                    <CheckBox DockPanel.Dock="Left"
+                              VerticalAlignment="Center"
+                              Content="_Auto-update"
+                              IsChecked="{Binding AutoUpdate}"
+                              AutomationProperties.Name="Auto-update" />
+                    <Button DockPanel.Dock="Right"
+                            Margin="8,0,0,0"
+                            Theme="{StaticResource AccentButton}"
+                            Content="_Download and update"
+                            ToolTip.Tip="Download the new version, then restart Scroll Keeper to install it"
+                            Command="{Binding DownloadAndUpdateCommand}" />
+                    <Button DockPanel.Dock="Right"
+                            Theme="{StaticResource DialogButton}"
+                            Content="Check for _updates"
+                            Command="{Binding CheckForUpdatesCommand}" />
+                </DockPanel>
+                <TextBlock Theme="{StaticResource SecondaryText}"
+                           Margin="26,4,0,0"
+                           Text="On every start, check GitHub for a newer release. If one is found, it is downloaded and installed, and Scroll Keeper restarts automatically." />
+                <TextBlock Margin="26,4,0,0"
+                           FontSize="12"
+                           Foreground="{DynamicResource AccentBrush}"
+                           Text="{Binding AvailableUpdateText}"
+                           IsVisible="{Binding HasAvailableUpdate}" />
+
+                <!-- Countdown before ScrollKeeper closes to install an update -->
+                <StackPanel Margin="0,14,0,0" Orientation="Horizontal">
+                    <TextBlock VerticalAlignment="Center"
+                               Text="Seconds before auto-restart"
+                               Foreground="{DynamicResource WindowForegroundBrush}" />
+                    <Button Margin="12,0,0,0"
+                            Theme="{StaticResource IconButton}"
+                            ToolTip.Tip="Decrease"
+                            AutomationProperties.Name="Decrease seconds before auto-restart"
+                            Command="{Binding DecreaseRestartDelayCommand}">
+                        <controls:Icon IconSize="14" Data="{StaticResource MinusGeometry}" />
+                    </Button>
+                    <TextBox Width="64"
+                             Margin="4,0"
+                             HorizontalContentAlignment="Center"
+                             TextAlignment="Center"
+                             MaxLength="3"
+                             Text="{Binding RestartDelayText}"
+                             behaviors:NumericInput.IsEnabled="True"
+                             behaviors:NumericInput.Maximum="{Binding MaxRestartDelaySeconds}"
+                             AutomationProperties.Name="Seconds before auto-restart" />
+                    <Button Theme="{StaticResource IconButton}"
+                            ToolTip.Tip="Increase"
+                            AutomationProperties.Name="Increase seconds before auto-restart"
+                            Command="{Binding IncreaseRestartDelayCommand}">
+                        <controls:Icon IconSize="14" Data="{StaticResource PlusGeometry}" />
+                    </Button>
+                </StackPanel>
+                <TextBlock Margin="0,6,0,0"
+                           FontSize="12"
+                           Foreground="{DynamicResource WarningForegroundBrush}"
+                           Text="{Binding MaxRestartDelaySeconds, StringFormat='Enter a number from 0 to {0}.'}"
+                           IsVisible="{Binding IsRestartDelayInvalid}" />
+
+                <TextBlock Margin="0,6,0,0"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Foreground="{DynamicResource WarningForegroundBrush}"
+                           Text="{Binding NotInstalledText}"
+                           IsVisible="{Binding IsNotInstalled}" />
+            </StackPanel>
+
+            <!-- ===== Toasts (bottom-right, above the content) ===== -->
+            <toastViews:ToastHost Grid.Row="1" ZIndex="10" />
+
+            <!-- ===== Footer ===== -->
+            <Border Grid.Row="2"
+                    Padding="20,12"
+                    Background="{DynamicResource TitleBarBackgroundBrush}"
+                    BorderBrush="{DynamicResource WindowBorderBrush}"
+                    BorderThickness="0,1,0,0">
+                <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
+                    <Button Theme="{StaticResource AccentButton}"
+                            Content="Save"
+                            IsDefault="True"
+                            Command="{Binding SaveCommand}" />
+                    <Button Margin="8,0,0,0"
+                            Theme="{StaticResource DialogButton}"
+                            Content="Cancel"
+                            Command="{Binding CancelCommand}" />
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Border>
+</controls:ChromeWindow>
