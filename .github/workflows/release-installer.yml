@@ -64,7 +64,7 @@ jobs:
           -o publish/${{ matrix.rid }}
 
       - name: Package
-        run: installer/linux/package.sh publish/${{ matrix.rid }} ${{ steps.version.outputs.version }} ${{ matrix.rid }} dist
+        run: bash installer/linux/package.sh publish/${{ matrix.rid }} ${{ steps.version.outputs.version }} ${{ matrix.rid }} dist
 
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
@@ -111,7 +111,7 @@ jobs:
           -o publish/${{ matrix.rid }}
 
       - name: Build the app bundle
-        run: installer/macos/package-app.sh publish/${{ matrix.rid }} ${{ steps.version.outputs.version }} ${{ matrix.rid }} dist
+        run: bash installer/macos/package-app.sh publish/${{ matrix.rid }} ${{ steps.version.outputs.version }} ${{ matrix.rid }} dist
 
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
