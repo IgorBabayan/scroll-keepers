@@ -1,4 +1,4 @@
-using System.Windows.Media;
+using Avalonia.Media.Imaging;
 
 namespace ScrollKeeper.Services.Images;
 
@@ -9,5 +9,5 @@ public interface IImageCache
     /// Returns the image decoded so its shorter side is <paramref name="decodeSize"/> pixels (0 = original size;
     /// smaller images are never upscaled), or <c>null</c> if it cannot be downloaded or decoded. Never throws.
     /// </summary>
-    Task<ImageSource?> GetAsync(string url, int decodeSize);
+    Task<Bitmap?> GetAsync(string url, int decodeSize);
 }

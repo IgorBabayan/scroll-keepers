@@ -1,0 +1,135 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:ScrollKeeper.Presentation.Controls"
+             xmlns:notifications="using:ScrollKeeper.Presentation.Services.Notifications"
+             x:Class="ScrollKeeper.Presentation.Views.Shell.ActionCenterView"
+             FontFamily="{StaticResource BodyFont}">
+
+    <!--
+        Content of the action center flyout (Popup in MainWindow.axaml). The outer margin leaves room for the shadow.
+    -->
+    <Grid Width="360" Margin="12,0,12,12">
+        <Border CornerRadius="8"
+                BorderThickness="1"
+                BorderBrush="{DynamicResource ControlBorderBrush}"
+                Background="{DynamicResource TitleBarBackgroundBrush}"
+                BoxShadow="0 2 16 0 #59000000">
+            <Grid RowDefinitions="Auto,Auto,*">
+
+                <!-- Header -->
+                <DockPanel Grid.Row="0" Margin="16,10,8,10" LastChildFill="True">
+                    <Button DockPanel.Dock="Right"
+                            Theme="{StaticResource TextLinkButton}"
+                            Content="Clear all"
+                            AutomationProperties.Name="Clear all notifications"
+                            Command="{Binding ClearAllCommand}"
+                            IsVisible="{Binding !Center.IsEmpty}" />
+                    <TextBlock VerticalAlignment="Center"
+                               FontFamily="{StaticResource HeadingFont}"
+                               FontSize="16"
+                               Foreground="{DynamicResource WindowForegroundBrush}"
+                               Text="Notifications" />
+                </DockPanel>
+
+                <Rectangle Grid.Row="1" Height="1" Fill="{DynamicResource WindowBorderBrush}" />
+
+                <!-- Nothing to show -->
+                <StackPanel Grid.Row="2"
+                            Margin="16,32"
+                            HorizontalAlignment="Center"
+                            IsVisible="{Binding Center.IsEmpty}">
+                    <controls:Icon HorizontalAlignment="Center"
+                                   IconSize="28"
+                                   StrokeThickness="1.5"
+                                   Data="{StaticResource BellGeometry}"
+                                   Foreground="{DynamicResource SecondaryForegroundBrush}" />
+                    <TextBlock Margin="0,10,0,0"
+                               HorizontalAlignment="Center"
+                               Theme="{StaticResource SecondaryText}"
+                               Text="You're all caught up" />
+                </StackPanel>
+
+                <!-- Notifications, newest first -->
+                <ScrollViewer Grid.Row="2"
+                              MaxHeight="440"
+                              Padding="6"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled"
+                              IsVisible="{Binding !Center.IsEmpty}">
+                    <ItemsControl ItemsSource="{Binding Center.Notifications}"
+                                  Focusable="False"
+                                  AutomationProperties.Name="Notifications">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="notifications:Notification">
+                                <Grid>
+                                    <!-- The whole row runs the notification's action. -->
+                                    <Button Theme="{StaticResource ListRowButton}"
+                                            Padding="10,10,36,10"
+                                            Command="{Binding $parent[ItemsControl].DataContext.ActivateCommand}"
+                                            CommandParameter="{Binding}"
+                                            AutomationProperties.Name="{Binding Title}">
+                                        <Grid ColumnDefinitions="Auto,*">
+                                            <!-- severity icon | text -->
+                                            <controls:SeverityIcon Grid.Column="0"
+                                                                   Margin="0,1,12,0"
+                                                                   VerticalAlignment="Top"
+                                                                   IconSize="18"
+                                                                   StrokeThickness="1.8"
+                                                                   Severity="{Binding Severity}" />
+
+                                            <StackPanel Grid.Column="1">
+                                                <DockPanel LastChildFill="True">
+                                                    <TextBlock DockPanel.Dock="Right"
+                                                               Margin="8,1,0,0"
+                                                               VerticalAlignment="Top"
+                                                               FontSize="11"
+                                                               Foreground="{DynamicResource SecondaryForegroundBrush}"
+                                                               Text="{Binding TimeText}" />
+                                                    <TextBlock Text="{Binding Title}"
+                                                               FontSize="13"
+                                                               FontWeight="SemiBold"
+                                                               TextWrapping="Wrap"
+                                                               Foreground="{DynamicResource WindowForegroundBrush}" />
+                                                </DockPanel>
+                                                <TextBlock Margin="0,2,0,0"
+                                                           Text="{Binding Details}"
+                                                           Theme="{StaticResource SecondaryText}"
+                                                           IsVisible="{Binding HasDetails}" />
+                                                <TextBlock Margin="0,6,0,0"
+                                                           FontSize="12"
+                                                           Foreground="{DynamicResource AccentBrush}"
+                                                           Text="{Binding ActionText}"
+                                                           IsVisible="{Binding HasAction}" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </Button>
+
+                                    <!-- Unread dot, in the row's left padding next to the icon. -->
+                                    <Ellipse Width="5"
+                                             Height="5"
+                                             Margin="2,17,0,0"
+                                             HorizontalAlignment="Left"
+                                             VerticalAlignment="Top"
+                                             IsHitTestVisible="False"
+                                             Fill="{DynamicResource AccentBrush}"
+                                             IsVisible="{Binding IsUnread}" />
+
+                                    <Button Margin="0,6,6,0"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Top"
+                                            ToolTip.Tip="Remove"
+                                            AutomationProperties.Name="Remove notification"
+                                            Theme="{StaticResource SubtleIconButton}"
+                                            Command="{Binding $parent[ItemsControl].DataContext.DismissCommand}"
+                                            CommandParameter="{Binding}">
+                                        <controls:Icon IconSize="11" Data="{StaticResource CloseGeometry}" />
+                                    </Button>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

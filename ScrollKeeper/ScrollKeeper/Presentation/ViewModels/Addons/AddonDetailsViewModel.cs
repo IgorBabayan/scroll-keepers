@@ -1,8 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Globalization;
-using System.IO;
-using System.Windows.Media;
+using Avalonia.Media.Imaging;
 using ScrollKeeper.Presentation.Documents;
 using ScrollKeeper.Presentation.Services;
 using ScrollKeeper.Services.Catalog;
@@ -174,16 +173,16 @@ public sealed partial class AddonDetailsViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void OpenScreenshot(ScreenshotViewModel? screenshot)
+    private Task OpenScreenshotAsync(ScreenshotViewModel? screenshot)
     {
         if (screenshot is null)
-            return;
+            return Task.CompletedTask;
 
         var index = Screenshots.IndexOf(screenshot);
         if (index < 0)
-            return;
+            return Task.CompletedTask;
 
-        _windows.ShowImageViewer(Title, Screenshots.ToList(), index);
+        return _windows.ShowImageViewerAsync(Title, Screenshots.ToList(), index);
     }
 }
 
@@ -195,7 +194,7 @@ public sealed partial class ScreenshotViewModel(string thumbnailUrl, string imag
     public string ImageUrl { get; } = imageUrl;
 
     [ObservableProperty]
-    private ImageSource? _image;
+    private Bitmap? _image;
 
     internal async Task LoadAsync(IImageCache images, int decodeSize)
     {

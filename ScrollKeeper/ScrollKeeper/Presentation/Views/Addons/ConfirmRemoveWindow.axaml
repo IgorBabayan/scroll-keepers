@@ -1,0 +1,111 @@
+<controls:ChromeWindow xmlns="https://github.com/avaloniaui"
+                      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                      xmlns:controls="using:ScrollKeeper.Presentation.Controls"
+                      x:Class="ScrollKeeper.Presentation.Views.Addons.ConfirmRemoveWindow"
+                      Title="Remove addon"
+                      Width="480"
+                      MaxHeight="640"
+                      SizeToContent="Height"
+                      CanResize="False"
+                      ShowInTaskbar="False"
+                      WindowStartupLocation="CenterOwner"
+                      FontFamily="{StaticResource BodyFont}"
+                      Background="{DynamicResource WindowBackgroundBrush}"
+                      Foreground="{DynamicResource WindowForegroundBrush}">
+
+    <Window.Styles>
+        <Style Selector="TextBlock.section">
+            <Setter Property="Foreground" Value="{DynamicResource WindowForegroundBrush}" />
+        </Style>
+        <Style Selector="TextBlock.section.warning">
+            <Setter Property="Foreground" Value="{DynamicResource WarningForegroundBrush}" />
+        </Style>
+    </Window.Styles>
+
+    <Border x:Name="RootBorder" BorderBrush="{DynamicResource WindowBorderBrush}" BorderThickness="1">
+        <Grid RowDefinitions="32,*,Auto">
+
+            <!-- ===== Title bar ===== -->
+            <Border x:Name="TitleBar"
+                    Grid.Row="0"
+                    Padding="{x:Static controls:PlatformChrome.TitleBarPadding}"
+                    Background="{DynamicResource TitleBarBackgroundBrush}">
+                <Panel>
+                    <TextBlock x:Name="TitleText"
+                               Margin="12,0,0,0"
+                               VerticalAlignment="Center"
+                               FontSize="12"
+                               Text="{Binding $parent[Window].Title}" />
+                    <Button HorizontalAlignment="Right"
+                            Theme="{StaticResource CloseCaptionButton}"
+                            ToolTip.Tip="Close"
+                            Click="OnCancel"
+                            IsVisible="{x:Static controls:PlatformChrome.HasCaptionButtons}">
+                        <controls:Icon IconSize="11" StrokeThickness="1.6" Data="{StaticResource CloseGeometry}" />
+                    </Button>
+                </Panel>
+            </Border>
+
+            <!-- ===== What will be deleted ===== -->
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="20,16,20,20">
+                    <TextBlock FontFamily="{StaticResource HeadingFont}"
+                               FontSize="18"
+                               TextWrapping="Wrap"
+                               Text="{Binding Heading}" />
+
+                    <ItemsControl Margin="0,4,0,0" ItemsSource="{Binding Sections}" Focusable="False">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Margin="0,12,0,0">
+                                    <TextBlock Classes="section"
+                                               Classes.warning="{Binding IsWarning}"
+                                               FontSize="13"
+                                               FontWeight="SemiBold"
+                                               TextWrapping="Wrap"
+                                               Text="{Binding Header}" />
+                                    <ItemsControl Margin="12,4,0,0" ItemsSource="{Binding Items}" Focusable="False">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Margin="0,1,0,1"
+                                                           FontSize="12"
+                                                           TextWrapping="Wrap"
+                                                           Foreground="{DynamicResource SecondaryForegroundBrush}"
+                                                           Text="{Binding StringFormat='• {0}'}" />
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <TextBlock Margin="0,16,0,0"
+                               FontSize="12"
+                               TextWrapping="Wrap"
+                               Foreground="{DynamicResource SecondaryForegroundBrush}"
+                               Text="Close the game first: it writes the settings files again when you log out." />
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- ===== Footer ===== -->
+            <Border Grid.Row="2"
+                    Padding="20,12"
+                    Background="{DynamicResource TitleBarBackgroundBrush}"
+                    BorderBrush="{DynamicResource WindowBorderBrush}"
+                    BorderThickness="0,1,0,0">
+                <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
+                    <Button Theme="{StaticResource AccentButton}"
+                            Content="Remove"
+                            Click="OnRemove" />
+                    <Button Margin="8,0,0,0"
+                            Theme="{StaticResource DialogButton}"
+                            Content="Cancel"
+                            IsCancel="True"
+                            IsDefault="True"
+                            Click="OnCancel" />
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Border>
+</controls:ChromeWindow>

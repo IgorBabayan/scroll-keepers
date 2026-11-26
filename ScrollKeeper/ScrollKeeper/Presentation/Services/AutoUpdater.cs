@@ -1,9 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics;
-using System.IO;
-using System.Net.Http;
 using System.Text.Json;
-using System.Windows;
 using ScrollKeeper.Presentation.Services.Notifications;
 using ScrollKeeper.Presentation.Services.Toasts;
 using ScrollKeeper.Services.Settings;
@@ -125,7 +122,7 @@ public sealed partial class AutoUpdater(
             updateService.LaunchInstaller(installerPath);
 
             // Exit now so the installer can replace the files; it starts the new version afterwards.
-            Application.Current.Shutdown();
+            App.Shutdown();
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
         {
@@ -208,9 +205,12 @@ public sealed partial class AutoUpdater(
         }
         else
         {
-            // Not an installed copy (e.g. run from the build folder): the update cannot be installed in place.
+            // Not an installed copy (e.g. run from the build folder, or Linux / macOS, where updates are not
+            // installed automatically): the update cannot be installed in place.
             notifications.Set(AppUpdateKey, $"Scroll Keeper {version} is available", ToastSeverity.Info,
-                "Install it with the installer from the release page.",
+                OperatingSystem.IsWindows()
+                    ? "Install it with the installer from the release page."
+                    : "Download it from the release page.",
                 "Open release page",
                 update.ReleasePageUrl is { } page ? () => OpenUrl(page) : null);
         }

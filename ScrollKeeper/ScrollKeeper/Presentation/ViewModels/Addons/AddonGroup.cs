@@ -1,8 +1,8 @@
 namespace ScrollKeeper.Presentation.ViewModels.Addons;
 
 /// <summary>
-/// A section of the Installed list: addons or libraries. The group object itself is the key of the
-/// <see cref="System.Windows.Data.CollectionViewGroup"/>, so the header binds to <c>Name.IsExpanded</c> and
+/// A section of the Installed list: addons or libraries. The group object itself is the header row of the list
+/// (see <c>MainViewModel.InstalledRows</c>), so the header binds to <c>IsExpanded</c> and
 /// the collapsed state survives rescans, searches and the group disappearing while it is empty.
 /// </summary>
 public sealed partial class AddonGroup : ViewModelBase
@@ -24,6 +24,10 @@ public sealed partial class AddonGroup : ViewModelBase
 
     [ObservableProperty]
     private bool _isExpanded = true;
+
+    /// <summary>Addons of the group that match the current search (shown next to the title).</summary>
+    [ObservableProperty]
+    private int _itemCount;
 
     public override string ToString() => Title;
 }

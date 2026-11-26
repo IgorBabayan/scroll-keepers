@@ -1,6 +1,5 @@
-using System.ComponentModel;
-using System.Windows;
-using System.Windows.Controls;
+using Avalonia;
+using Avalonia.Controls;
 using ScrollKeeper.Presentation.Services.Toasts;
 
 namespace ScrollKeeper.Presentation.Views.Toasts;
@@ -18,19 +17,18 @@ public partial class ToastHost : UserControl
     {
         InitializeComponent();
 
-        if (DesignerProperties.GetIsInDesignMode(this))
+        if (Design.IsDesignMode)
             return;
 
         // Created by XAML, so constructor injection is not available here.
         DataContext = App.Services.GetRequiredService<IToastService>();
-
-        Loaded += OnLoaded;
-        Unloaded += OnUnloaded;
     }
 
-    private void OnLoaded(object sender, RoutedEventArgs e)
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
-        _window = Window.GetWindow(this);
+        base.OnAttachedToVisualTree(e);
+
+        _window = TopLevel.GetTopLevel(this) as Window;
         if (_window is null)
             return;
 
@@ -39,8 +37,10 @@ public partial class ToastHost : UserControl
         UpdateVisibility();
     }
 
-    private void OnUnloaded(object sender, RoutedEventArgs e)
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
+        base.OnDetachedFromVisualTree(e);
+
         if (_window is null)
             return;
 
@@ -57,7 +57,7 @@ public partial class ToastHost : UserControl
             return;
 
         // An open owned dialog hosts the toasts itself (it is in front of this window).
-        var hasOpenDialog = !_window.IsActive && _window.OwnedWindows.OfType<Window>().Any(w => w.IsVisible);
-        Visibility = hasOpenDialog ? Visibility.Collapsed : Visibility.Visible;
+        var hasOpenDialog = !_window.IsActive && _window.OwnedWindows.Any(w => w.IsVisible);
+        IsVisible = !hasOpenDialog;
     }
 }

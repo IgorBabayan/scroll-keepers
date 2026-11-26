@@ -1,8 +1,8 @@
 <!--
     Dark palette of Claude for desktop: warm charcoal surfaces, ivory text and the clay accent.
-    Every palette must define the same set of keys (see ClaudeLight.xaml).
+    Every palette must define the same set of keys (see ClaudeLight.axaml).
 -->
-<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <SolidColorBrush x:Key="TitleBarBackgroundBrush"         Color="#1F1E1D" />
@@ -32,5 +32,19 @@
     <SolidColorBrush x:Key="WarningForegroundBrush"          Color="#E5B95C" />
     <SolidColorBrush x:Key="ErrorForegroundBrush"            Color="#F1707B" />
     <SolidColorBrush x:Key="SuccessForegroundBrush"          Color="#7BC17E" />
+
+
+    <!--
+        Accent and selection colors of the stock Fluent controls (TextBox focus, text selection), so they use
+        the clay accent instead of the system accent color.
+    -->
+    <Color x:Key="SystemAccentColor">#D97757</Color>
+    <Color x:Key="SystemAccentColorDark1">#C6613F</Color>
+    <Color x:Key="SystemAccentColorDark2">#A44E33</Color>
+    <Color x:Key="SystemAccentColorDark3">#A44E33</Color>
+    <Color x:Key="SystemAccentColorLight1">#E08A6D</Color>
+    <Color x:Key="SystemAccentColorLight2">#E9A58C</Color>
+    <Color x:Key="SystemAccentColorLight3">#E9A58C</Color>
+    <SolidColorBrush x:Key="TextControlSelectionHighlightColor" Color="#D97757" />
 
 </ResourceDictionary>

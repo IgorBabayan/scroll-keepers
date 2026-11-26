@@ -7,13 +7,14 @@ public enum AppTheme
 }
 
 /// <summary>
-/// Applies the Claude palette (Themes/Colors/Claude*.xaml). Like Claude for desktop, it follows the
-/// Windows app mode (Settings → Personalization → Colors) and switches live when it changes.
+/// Applies the Claude palette (Themes/Colors/Claude*.axaml). Like Claude for desktop, it follows the
+/// operating system's light / dark mode (Windows app mode, macOS appearance, the Linux desktop's color scheme)
+/// and switches live when it changes.
 /// </summary>
 public interface IThemeService
 {
     AppTheme CurrentTheme { get; }
 
-    /// <summary>Applies the theme that matches the Windows app mode and starts following it.</summary>
+    /// <summary>Applies the theme that matches the system mode and starts following it.</summary>
     void Initialize();
 }

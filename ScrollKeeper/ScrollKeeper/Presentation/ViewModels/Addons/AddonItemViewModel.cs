@@ -1,5 +1,5 @@
 using System.Globalization;
-using System.Windows.Media;
+using Avalonia.Media.Imaging;
 using ScrollKeeper.Services.Addons;
 using ScrollKeeper.Services.Catalog;
 using ScrollKeeper.Services.Images;
@@ -18,7 +18,7 @@ public sealed partial class AddonItemViewModel : ViewModelBase
     private readonly IAddonActions _actions;
     private readonly IImageCache _images;
 
-    private ImageSource? _icon;
+    private Bitmap? _icon;
     private string? _requestedIconUrl;
 
     public AddonItemViewModel(string key, IAddonActions actions, IImageCache images)
@@ -123,7 +123,7 @@ public sealed partial class AddonItemViewModel : ViewModelBase
     private string? FullIconUrl => Catalog is { Thumbnails.Count: > 0 } catalog ? catalog.Images.FirstOrDefault() : null;
 
     /// <summary>Loaded on first use, so only rows scrolled into view download their icon.</summary>
-    public ImageSource? Icon
+    public Bitmap? Icon
     {
         get
         {
@@ -263,7 +263,7 @@ public sealed partial class AddonItemViewModel : ViewModelBase
             SetIcon(full);
     }
 
-    private void SetIcon(ImageSource image)
+    private void SetIcon(Bitmap image)
     {
         _icon = image;
         OnPropertyChanged(nameof(Icon));

@@ -1,6 +1,5 @@
 using System.ComponentModel;
 using System.Globalization;
-using System.IO;
 using ScrollKeeper.Presentation.Services;
 using ScrollKeeper.Services.Settings;
 using ScrollKeeper.Services.Updates;
@@ -52,6 +51,14 @@ public sealed partial class SettingsViewModel : ViewModelBase
 
     public string CurrentVersionText { get; }
 
+    /// <summary>Where the game keeps its AddOns folder on this operating system.</summary>
+    public string AddonsFolderHint { get; } = OperatingSystem.IsWindows()
+        ? @"The Elder Scrolls Online AddOns folder, usually Documents\Elder Scrolls Online\live\AddOns (liveeu for the EU server)."
+        : OperatingSystem.IsMacOS()
+            ? "The Elder Scrolls Online AddOns folder, usually Documents/Elder Scrolls Online/live/AddOns (liveeu for the EU server)."
+            : "The Elder Scrolls Online AddOns folder: Documents/Elder Scrolls Online/live/AddOns (liveeu for the EU server) "
+              + "inside the Wine or Steam Proton prefix of the game, e.g. steamapps/compatdata/306130/pfx/drive_c/users/steamuser.";
+
     /// <summary>Text of the "Seconds before auto-restart" box; digits only (see NumericInput).</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsRestartDelayInvalid))]
@@ -74,6 +81,11 @@ public sealed partial class SettingsViewModel : ViewModelBase
     /// <summary>True for development builds / unpacked copies, which are never updated.</summary>
     public bool IsNotInstalled { get; }
 
+    /// <summary>Why <see cref="IsNotInstalled"/> copies are not updated.</summary>
+    public string NotInstalledText { get; } = OperatingSystem.IsWindows()
+        ? "This copy was not installed with the installer, so it will not be updated."
+        : "Updates are installed automatically on Windows only. New versions are announced in the notifications; download them from the release page.";
+
     /// <summary>True when a path is entered but the folder does not exist.</summary>
     public bool IsAddonsFolderMissing =>
         !string.IsNullOrWhiteSpace(AddonsFolderPath) && !Directory.Exists(AddonsFolderPath.Trim());
@@ -85,12 +97,12 @@ public sealed partial class SettingsViewModel : ViewModelBase
         && !string.Equals(Path.GetFileName(AddonsFolderPath.Trim().TrimEnd('\\', '/')), "AddOns", StringComparison.OrdinalIgnoreCase);
 
     [RelayCommand]
-    private void SelectFolder()
+    private async Task SelectFolderAsync()
     {
         var current = AddonsFolderPath.Trim();
         var initial = Directory.Exists(current) ? current : EsoPaths.GameDocumentsFolder;
 
-        var folder = _folderPicker.PickFolder("Select the Elder Scrolls Online AddOns folder", initial);
+        var folder = await _folderPicker.PickFolderAsync("Select the Elder Scrolls Online AddOns folder", initial);
         if (folder is not null)
             AddonsFolderPath = folder;
     }

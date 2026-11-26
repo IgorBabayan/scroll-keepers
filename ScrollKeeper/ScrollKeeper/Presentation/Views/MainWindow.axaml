@@ -1,0 +1,342 @@
+<controls:ChromeWindow xmlns="https://github.com/avaloniaui"
+                      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                      xmlns:controls="using:ScrollKeeper.Presentation.Controls"
+                      xmlns:toastViews="using:ScrollKeeper.Presentation.Views.Toasts"
+                      xmlns:shellViews="using:ScrollKeeper.Presentation.Views.Shell"
+                      x:Class="ScrollKeeper.Presentation.Views.MainWindow"
+                      Title="Scroll Keeper"
+                      Width="1100"
+                      Height="720"
+                      MinWidth="760"
+                      MinHeight="480"
+                      WindowStartupLocation="CenterScreen"
+                      FontFamily="{StaticResource BodyFont}"
+                      Background="{DynamicResource WindowBackgroundBrush}"
+                      Foreground="{DynamicResource WindowForegroundBrush}">
+
+    <!--
+        The title bar is drawn by the app (see ChromeWindow): drag to move, double-click to maximize,
+        resizing from the edges. Notifications / Settings / Minimize / Maximize / Close are in the title bar
+        (on macOS the system traffic lights replace Minimize / Maximize / Close).
+    -->
+    <Border x:Name="RootBorder"
+            BorderBrush="{DynamicResource WindowBorderBrush}"
+            BorderThickness="1">
+        <Grid RowDefinitions="32,*">
+
+            <!-- ===== Title bar ===== -->
+            <Border x:Name="TitleBar"
+                    Grid.Row="0"
+                    Padding="{x:Static controls:PlatformChrome.TitleBarPadding}"
+                    Background="{DynamicResource TitleBarBackgroundBrush}">
+                <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                    <!-- icon + title | free drag area | custom buttons | min / max / close -->
+
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
+                        <!-- Application icon. -->
+                        <Image Width="16"
+                               Height="16"
+                               Margin="0,0,8,0"
+                               VerticalAlignment="Center"
+                               RenderOptions.BitmapInterpolationMode="HighQuality"
+                               Source="avares://ScrollKeeper/Assets/App.png" />
+                        <TextBlock x:Name="TitleText"
+                                   Text="{Binding $parent[Window].Title}"
+                                   FontSize="12"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+
+                    <!-- Custom buttons placed before the standard caption buttons -->
+                    <StackPanel Grid.Column="2" Orientation="Horizontal">
+                        <!--
+                            Action center. While the flyout is open the button ignores the mouse: the click that closes the
+                            (light-dismiss) popup must not reopen it right away.
+                        -->
+                        <ToggleButton x:Name="ActionCenterButton"
+                                      Theme="{StaticResource TitleBarToolToggleButton}"
+                                      ToolTip.Tip="Notifications (Ctrl+Shift+N)"
+                                      AutomationProperties.Name="Notifications"
+                                      IsChecked="{Binding ActionCenter.IsOpen, Mode=TwoWay}"
+                                      IsHitTestVisible="{Binding !ActionCenter.IsOpen}">
+                            <Panel>
+                                <controls:Icon IconSize="16" Data="{StaticResource BellGeometry}" />
+                                <!-- Unread count -->
+                                <Border MinWidth="14"
+                                        Height="14"
+                                        Margin="0,-7,-10,0"
+                                        Padding="3,0"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Top"
+                                        CornerRadius="7"
+                                        Background="{DynamicResource AccentBrush}"
+                                        IsVisible="{Binding ActionCenter.Center.HasUnread}">
+                                    <TextBlock HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               FontFamily="{StaticResource BodyFont}"
+                                               FontSize="9"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource AccentForegroundBrush}"
+                                               Text="{Binding ActionCenter.Center.UnreadCount}" />
+                                </Border>
+                            </Panel>
+                        </ToggleButton>
+                        <!-- Right edge aligned with the bell: the offset compensates the flyout's shadow margin. -->
+                        <Popup x:Name="ActionCenterPopup"
+                               PlacementTarget="{Binding #ActionCenterButton}"
+                               Placement="BottomEdgeAlignedRight"
+                               HorizontalOffset="12"
+                               IsLightDismissEnabled="True"
+                               IsOpen="{Binding ActionCenter.IsOpen, Mode=TwoWay}">
+                            <shellViews:ActionCenterView DataContext="{Binding ActionCenter}" />
+                        </Popup>
+                        <Button x:Name="SettingsButton"
+                                Theme="{StaticResource TitleBarToolButton}"
+                                ToolTip.Tip="Settings (Ctrl+,)"
+                                AutomationProperties.Name="Settings"
+                                Command="{Binding OpenSettingsCommand}">
+                            <controls:Icon IconSize="16" Data="{StaticResource SettingsGeometry}" />
+                        </Button>
+                        <Rectangle Width="1"
+                                   Margin="4,8"
+                                   Fill="{DynamicResource WindowBorderBrush}"
+                                   IsVisible="{x:Static controls:PlatformChrome.HasCaptionButtons}" />
+                    </StackPanel>
+
+                    <!-- Standard caption buttons -->
+                    <StackPanel Grid.Column="3"
+                                Orientation="Horizontal"
+                                IsVisible="{x:Static controls:PlatformChrome.HasCaptionButtons}">
+                        <Button Theme="{StaticResource CaptionButton}"
+                                ToolTip.Tip="Minimize"
+                                AutomationProperties.Name="Minimize"
+                                Click="OnMinimizeClick">
+                            <controls:Icon IconSize="11" StrokeThickness="1.6" Data="{StaticResource MinimizeGeometry}" />
+                        </Button>
+                        <!-- Maximize / Restore: icon and tooltip follow the window state (see MainWindow.axaml.cs). -->
+                        <Button x:Name="MaximizeButton"
+                                Theme="{StaticResource CaptionButton}"
+                                ToolTip.Tip="Maximize"
+                                AutomationProperties.Name="Maximize"
+                                Click="OnMaximizeClick">
+                            <controls:Icon x:Name="MaximizeIcon"
+                                           IconSize="11"
+                                           StrokeThickness="1.6"
+                                           Data="{StaticResource MaximizeGeometry}" />
+                        </Button>
+                        <Button Theme="{StaticResource CloseCaptionButton}"
+                                ToolTip.Tip="Close"
+                                AutomationProperties.Name="Close"
+                                Click="OnCloseClick">
+                            <controls:Icon IconSize="11" StrokeThickness="1.6" Data="{StaticResource CloseGeometry}" />
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- ===== Content: Installed / Browse ===== -->
+            <TabControl Grid.Row="1"
+                        Margin="16,6,16,0"
+                        Theme="{StaticResource UnderlineTabControl}"
+                        SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}">
+
+                <!-- ===== Installed ===== -->
+                <TabItem>
+                    <TabItem.Header>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{Binding InstalledHeader}" />
+                            <Border Margin="8,0,0,0"
+                                    Padding="6,0"
+                                    MinWidth="18"
+                                    CornerRadius="9"
+                                    VerticalAlignment="Center"
+                                    Background="{DynamicResource AccentBrush}"
+                                    ToolTip.Tip="{Binding UpdatesText}"
+                                    IsVisible="{Binding HasUpdates}">
+                                <TextBlock HorizontalAlignment="Center"
+                                           FontSize="11"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource AccentForegroundBrush}"
+                                           Text="{Binding UpdatesCount}" />
+                            </Border>
+                        </StackPanel>
+                    </TabItem.Header>
+
+                    <Grid RowDefinitions="Auto,*">
+
+                        <!-- Toolbar -->
+                        <DockPanel Grid.Row="0" Margin="0,12,0,8" LastChildFill="False">
+                            <TextBox DockPanel.Dock="Left"
+                                     Width="300"
+                                     Classes="search"
+                                     Watermark="Search installed addons"
+                                     AutomationProperties.Name="Search installed addons"
+                                     Text="{Binding InstalledSearchText}">
+                                <TextBox.InnerLeftContent>
+                                    <controls:Icon Margin="10,0,0,0"
+                                                   IconSize="14"
+                                                   Data="{StaticResource SearchGeometry}"
+                                                   Foreground="{DynamicResource SecondaryForegroundBrush}" />
+                                </TextBox.InnerLeftContent>
+                            </TextBox>
+                            <Button DockPanel.Dock="Right"
+                                    Margin="8,0,0,0"
+                                    Theme="{StaticResource IconButton}"
+                                    ToolTip.Tip="Rescan the AddOns folder and check ESOUI for updates (F5)"
+                                    AutomationProperties.Name="Refresh"
+                                    Command="{Binding RefreshCommand}">
+                                <controls:Icon IconSize="16" Data="{StaticResource RefreshGeometry}" />
+                            </Button>
+                            <Button DockPanel.Dock="Right"
+                                    Theme="{StaticResource AccentButton}"
+                                    Content="Update all"
+                                    ToolTip.Tip="{Binding UpdatesText}"
+                                    Command="{Binding UpdateAllCommand}"
+                                    IsVisible="{Binding HasUpdates}" />
+                            <TextBlock DockPanel.Dock="Right"
+                                       Margin="0,0,12,0"
+                                       VerticalAlignment="Center"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource AccentBrush}"
+                                       Text="{Binding UpdatesText}"
+                                       IsVisible="{Binding HasUpdates}" />
+                        </DockPanel>
+
+                        <!-- Grouped list: section headers (Addons / Libraries) and addon rows in one virtualized list. -->
+                        <ListBox Grid.Row="1"
+                                 Margin="-12,0"
+                                 Theme="{StaticResource AddonListBox}"
+                                 ItemsSource="{Binding InstalledRows}"
+                                 ItemTemplate="{StaticResource GroupedAddonRowTemplate}"
+                                 AutomationProperties.Name="Installed addons" />
+
+                        <!-- AddOns folder not found -->
+                        <StackPanel Grid.Row="1"
+                                    MaxWidth="460"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    IsVisible="{Binding IsAddonsFolderMissing}">
+                            <TextBlock HorizontalAlignment="Center"
+                                       FontFamily="{StaticResource HeadingFont}"
+                                       FontSize="20"
+                                       Text="Where are your addons?" />
+                            <TextBlock Margin="0,8,0,0"
+                                       HorizontalAlignment="Center"
+                                       TextAlignment="Center"
+                                       Theme="{StaticResource SecondaryText}"
+                                       Text="{Binding AddonsFolder, StringFormat='The AddOns folder was not found at {0}. Choose the folder of your Elder Scrolls Online installation in Settings.'}" />
+                            <Button Margin="0,16,0,0"
+                                    HorizontalAlignment="Center"
+                                    Theme="{StaticResource AccentButton}"
+                                    Content="Open Settings"
+                                    Command="{Binding OpenSettingsCommand}" />
+                        </StackPanel>
+
+                        <!-- Nothing installed yet -->
+                        <StackPanel Grid.Row="1"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    IsVisible="{Binding IsInstalledEmpty}">
+                            <TextBlock HorizontalAlignment="Center"
+                                       FontFamily="{StaticResource HeadingFont}"
+                                       FontSize="20"
+                                       Text="No addons installed yet" />
+                            <TextBlock Margin="0,8,0,0"
+                                       HorizontalAlignment="Center"
+                                       Theme="{StaticResource SecondaryText}"
+                                       Text="Find something you like in Browse." />
+                        </StackPanel>
+                    </Grid>
+                </TabItem>
+
+                <!-- ===== Browse ===== -->
+                <TabItem Header="{Binding BrowseHeader}">
+                    <Grid RowDefinitions="Auto,Auto,*">
+
+                        <!-- Toolbar -->
+                        <DockPanel Grid.Row="0" Margin="0,12,0,8" LastChildFill="False">
+                            <TextBox DockPanel.Dock="Left"
+                                     Width="300"
+                                     Classes="search"
+                                     Watermark="Search by name, author or category"
+                                     AutomationProperties.Name="Search addons"
+                                     Text="{Binding BrowseSearchText}">
+                                <TextBox.InnerLeftContent>
+                                    <controls:Icon Margin="10,0,0,0"
+                                                   IconSize="14"
+                                                   Data="{StaticResource SearchGeometry}"
+                                                   Foreground="{DynamicResource SecondaryForegroundBrush}" />
+                                </TextBox.InnerLeftContent>
+                            </TextBox>
+                            <ListBox DockPanel.Dock="Left"
+                                     Margin="12,0,0,0"
+                                     VerticalAlignment="Center"
+                                     Theme="{StaticResource PillListBox}"
+                                     ItemsSource="{Binding SortOptions}"
+                                     SelectedItem="{Binding SelectedSortOption, Mode=TwoWay}"
+                                     AutomationProperties.Name="Sort by">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding DisplayName}" />
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                            <Button DockPanel.Dock="Right"
+                                    Theme="{StaticResource IconButton}"
+                                    ToolTip.Tip="Reload the addon list from ESOUI (F5)"
+                                    AutomationProperties.Name="Refresh"
+                                    Command="{Binding RefreshCommand}">
+                                <controls:Icon IconSize="16" Data="{StaticResource RefreshGeometry}" />
+                            </Button>
+                            <TextBlock DockPanel.Dock="Right"
+                                       Margin="0,0,12,0"
+                                       VerticalAlignment="Center"
+                                       FontSize="12"
+                                       Foreground="{DynamicResource WarningForegroundBrush}"
+                                       Text="Offline: showing the list from your last visit"
+                                       IsVisible="{Binding IsCatalogFromCache}" />
+                        </DockPanel>
+
+                        <ProgressBar Grid.Row="1"
+                                     Height="3"
+                                     Margin="0,0,0,4"
+                                     IsIndeterminate="True"
+                                     AutomationProperties.Name="Loading the addon list"
+                                     IsVisible="{Binding IsLoadingCatalog}" />
+
+                        <ListBox Grid.Row="2"
+                                 Margin="-12,0"
+                                 Theme="{StaticResource AddonListBox}"
+                                 ItemsSource="{Binding BrowseItems}"
+                                 ItemTemplate="{StaticResource AddonRowTemplate}"
+                                 AutomationProperties.Name="Available addons" />
+
+                        <!-- Catalog could not be loaded -->
+                        <StackPanel Grid.Row="2"
+                                    MaxWidth="460"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    IsVisible="{Binding HasCatalogError}">
+                            <TextBlock HorizontalAlignment="Center"
+                                       FontFamily="{StaticResource HeadingFont}"
+                                       FontSize="20"
+                                       Text="ESOUI is out of reach" />
+                            <TextBlock Margin="0,8,0,0"
+                                       HorizontalAlignment="Center"
+                                       TextAlignment="Center"
+                                       Theme="{StaticResource SecondaryText}"
+                                       Text="{Binding CatalogError}" />
+                            <Button Margin="0,16,0,0"
+                                    HorizontalAlignment="Center"
+                                    Theme="{StaticResource AccentButton}"
+                                    Content="Try again"
+                                    Command="{Binding RefreshCommand}" />
+                        </StackPanel>
+                    </Grid>
+                </TabItem>
+            </TabControl>
+
+            <!-- ===== Toasts (bottom-right, above the content) ===== -->
+            <toastViews:ToastHost Grid.Row="1" ZIndex="10" />
+        </Grid>
+    </Border>
+</controls:ChromeWindow>

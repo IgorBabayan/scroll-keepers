@@ -2,10 +2,10 @@
 
     <PropertyGroup>
         <OutputType>WinExe</OutputType>
-        <TargetFramework>net10.0-windows</TargetFramework>
+        <!-- Cross-platform UI (Avalonia): one project builds for Windows, Linux and macOS. -->
+        <TargetFramework>net10.0</TargetFramework>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
-        <UseWPF>true</UseWPF>
         <AssemblyName>ScrollKeeper</AssemblyName>
         <RootNamespace>ScrollKeeper</RootNamespace>
         <Product>Scroll Keeper</Product>
@@ -14,16 +14,27 @@
         <!-- Major.Minor for releases; CI appends the build number as the patch part. -->
         <VersionPrefix>0.1.0</VersionPrefix>
         <ApplicationIcon>App.ico</ApplicationIcon>
+        <ApplicationManifest>app.manifest</ApplicationManifest>
+        <!-- Needed by Avalonia on Windows (clipboard, drag and drop) when not compiled ahead of time. -->
+        <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+        <!-- Bindings are resolved at runtime, like WPF: templates bind to DataContext of the ancestors. -->
+        <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
+        <AvaloniaVersion>11.3.23</AvaloniaVersion>
     </PropertyGroup>
 
     <ItemGroup>
+        <PackageReference Include="Avalonia" Version="$(AvaloniaVersion)" />
+        <PackageReference Include="Avalonia.Desktop" Version="$(AvaloniaVersion)" />
+        <PackageReference Include="Avalonia.Themes.Fluent" Version="$(AvaloniaVersion)" />
+        <!-- Bundled UI font used wherever the platform fonts listed in BodyFont are missing (e.g. minimal Linux installs). -->
+        <PackageReference Include="Avalonia.Fonts.Inter" Version="$(AvaloniaVersion)" />
         <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
     </ItemGroup>
 
     <ItemGroup>
-        <!-- Also embed the icon as a WPF resource so XAML can show it via pack URI. -->
-        <Resource Include="App.ico" />
+        <!-- Window and title bar icon (avares://ScrollKeeper/Assets/App.png). App.ico stays the Windows executable icon. -->
+        <AvaloniaResource Include="Assets\**" />
     </ItemGroup>
 
 </Project>

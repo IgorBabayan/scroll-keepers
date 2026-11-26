@@ -1,10 +1,7 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
-using System.IO;
-using System.Net.Http;
-using System.Windows.Data;
-using System.Windows.Threading;
+using Avalonia.Threading;
 using ScrollKeeper.Presentation.Services;
 using ScrollKeeper.Presentation.Services.Notifications;
 using ScrollKeeper.Presentation.Services.Toasts;
@@ -47,9 +44,12 @@ public sealed partial class MainViewModel : ViewModelBase, IAddonActions
     private readonly Dictionary<string, AddonItemViewModel> _items = new(StringComparer.Ordinal);
     /// <summary>Addons listed in the last "updates available" notification.</summary>
     private HashSet<string> _notifiedUpdates = new(StringComparer.Ordinal);
-    private readonly ObservableCollection<AddonItemViewModel> _installed = [];
+    /// <summary>Everything in the AddOns folder, unsorted; <see cref="InstalledRows"/> is what the list shows.</summary>
+    private readonly List<AddonItemViewModel> _installed = [];
     /// <summary>Replaced as a whole when the catalog loads (see <see cref="ApplyCatalog"/>).</summary>
     private List<AddonItemViewModel> _browse = [];
+    /// <summary>A rebuild of <see cref="InstalledRows"/> is queued (several changes arrive at once).</summary>
+    private bool _isInstalledRebuildQueued;
     private readonly SemaphoreSlim _refreshLock = new(1, 1);
     private readonly DispatcherTimer _installedSearchTimer;
     private readonly DispatcherTimer _browseSearchTimer;
@@ -87,36 +87,21 @@ public sealed partial class MainViewModel : ViewModelBase, IAddonActions
         _windows = windows;
         ActionCenter = actionCenter;
 
-        // Installed: grouped into addons and libraries (in that order, groups follow the first sort key);
-        // inside a group, addons with updates first, then by name. Live sorting and grouping move a row once it
-        // is updated or its manifest changes.
-        var installedView = (ListCollectionView)CollectionViewSource.GetDefaultView(_installed);
-        installedView.GroupDescriptions.Add(new PropertyGroupDescription(nameof(AddonItemViewModel.Group)));
-        installedView.SortDescriptions.Add(new SortDescription(nameof(AddonItemViewModel.GroupOrder), ListSortDirection.Ascending));
-        installedView.SortDescriptions.Add(new SortDescription(nameof(AddonItemViewModel.HasUpdate), ListSortDirection.Descending));
-        installedView.SortDescriptions.Add(new SortDescription(nameof(AddonItemViewModel.Name), ListSortDirection.Ascending));
-        installedView.IsLiveSorting = true;
-        installedView.LiveSortingProperties.Add(nameof(AddonItemViewModel.GroupOrder));
-        installedView.LiveSortingProperties.Add(nameof(AddonItemViewModel.HasUpdate));
-        installedView.LiveSortingProperties.Add(nameof(AddonItemViewModel.Name));
-        installedView.IsLiveGrouping = true;
-        installedView.LiveGroupingProperties.Add(nameof(AddonItemViewModel.Group));
-        installedView.Filter = o => Matches((AddonItemViewModel)o, InstalledSearchText);
-        InstalledView = installedView;
-
-        _browseView = CreateBrowseView(_browse);
-
         SortOptions =
         [
             new BrowseSortOption(BrowseSort.Popular, "Popular"),
             new BrowseSortOption(BrowseSort.RecentlyUpdated, "Recently updated"),
             new BrowseSortOption(BrowseSort.Name, "Name")
         ];
-        // Sets the Browse view's CustomSort (OnSelectedSortOptionChanged).
+        // Sorts the Browse list (OnSelectedSortOptionChanged).
         SelectedSortOption = SortOptions[0];
 
-        _installedSearchTimer = CreateSearchTimer(() => RefreshView(InstalledView));
-        _browseSearchTimer = CreateSearchTimer(() => RefreshView(BrowseView));
+        _installedSearchTimer = CreateSearchTimer(RebuildInstalledRows);
+        _browseSearchTimer = CreateSearchTimer(RebuildBrowseItems);
+
+        // Collapsing or expanding a group shows or hides its rows.
+        AddonGroup.Addons.PropertyChanged += OnGroupPropertyChanged;
+        AddonGroup.Libraries.PropertyChanged += OnGroupPropertyChanged;
 
         _settings.SettingsChanged += OnSettingsChanged;
     }
@@ -124,14 +109,19 @@ public sealed partial class MainViewModel : ViewModelBase, IAddonActions
     /// <summary>The bell in the title bar.</summary>
     public ActionCenterViewModel ActionCenter { get; }
 
-    public ICollectionView InstalledView { get; }
+    /// <summary>
+    /// Rows of the Installed list: grouped into addons and libraries (in that order), each group led by its
+    /// <see cref="AddonGroup"/> header; inside a group, addons with updates first, then by name. Kept in step with
+    /// the addons (live sorting and grouping): a row moves once it is updated or its manifest changes.
+    /// </summary>
+    public ObservableCollection<object> InstalledRows { get; } = [];
 
     /// <summary>
-    /// A new view is created for every catalog load: filling the old one item by item would raise thousands of
-    /// change notifications, and its source must not change while its refresh is deferred.
+    /// Rows of the Browse list, filtered by the search box and sorted by the selected option. A new list is set for
+    /// every change: filling the old one item by item would raise thousands of change notifications.
     /// </summary>
     [ObservableProperty]
-    private ListCollectionView _browseView;
+    private IReadOnlyList<AddonItemViewModel> _browseItems = [];
 
     public IReadOnlyList<BrowseSortOption> SortOptions { get; }
 
@@ -206,7 +196,7 @@ public sealed partial class MainViewModel : ViewModelBase, IAddonActions
     private bool CanRefresh() => !IsLoadingCatalog;
 
     [RelayCommand]
-    private void OpenSettings() => _windows.ShowSettings();
+    private Task OpenSettingsAsync() => _windows.ShowSettingsAsync();
 
     /// <summary>Updates every addon that has an update, a few at a time.</summary>
     [RelayCommand]
@@ -345,8 +335,8 @@ public sealed partial class MainViewModel : ViewModelBase, IAddonActions
             return;
         }
 
-        // The addon may have started installing while the folder was read.
-        if (item.IsBusy || !_windows.ConfirmRemoval(item.Name, plan))
+        // The addon may have started installing while the folder was read (or while the dialog was open).
+        if (item.IsBusy || !await _windows.ConfirmRemovalAsync(item.Name, plan) || item.IsBusy)
             return;
 
         var name = item.Name;
@@ -385,7 +375,7 @@ public sealed partial class MainViewModel : ViewModelBase, IAddonActions
         }
     }
 
-    public void OpenDetails(AddonItemViewModel item) => _windows.ShowAddonDetails(item);
+    public void OpenDetails(AddonItemViewModel item) => _ = _windows.ShowAddonDetailsAsync(item);
 
     // ===== Dependencies =====
 
@@ -524,7 +514,7 @@ public sealed partial class MainViewModel : ViewModelBase, IAddonActions
             item.SetCatalog(null, null);
 
         _browse = browse;
-        BrowseView = CreateBrowseView(browse);
+        RebuildBrowseItems();
 
         OnPropertyChanged(nameof(BrowseHeader));
     }
@@ -550,17 +540,23 @@ public sealed partial class MainViewModel : ViewModelBase, IAddonActions
                 var item = GetOrCreateItem(addon.Key);
                 item.SetInstalled(addon);
                 if (!_installed.Contains(item))
+                {
                     _installed.Add(item);
+                    item.PropertyChanged += OnInstalledItemPropertyChanged;
+                }
             }
 
             foreach (var item in _installed.Where(i => !keys.Contains(i.Key)).ToList())
             {
                 item.SetInstalled(null);
                 _installed.Remove(item);
+                item.PropertyChanged -= OnInstalledItemPropertyChanged;
                 // Local-only addons exist only while they are installed.
                 if (item.Catalog is null && !item.IsBusy)
                     _items.Remove(item.Key);
             }
+
+            RebuildInstalledRows();
 
             OnPropertyChanged(nameof(InstalledCount));
             OnPropertyChanged(nameof(UpdatesCount));
@@ -608,7 +604,7 @@ public sealed partial class MainViewModel : ViewModelBase, IAddonActions
 
         if (IsAddonsFolderMissing)
             _notifications.Set(AddonsFolderKey, "AddOns folder not found", ToastSeverity.Error,
-                $"Nothing was found at {AddonsFolder}.", "Open Settings", OpenSettings);
+                $"Nothing was found at {AddonsFolder}.", "Open Settings", () => _ = OpenSettingsAsync());
         else
             _notifications.Remove(AddonsFolderKey);
     }
@@ -648,21 +644,112 @@ public sealed partial class MainViewModel : ViewModelBase, IAddonActions
     partial void OnSelectedSortOptionChanged(BrowseSortOption value)
     {
         if (value is not null)
-            BrowseView.CustomSort = value.Comparer;
+            RebuildBrowseItems();
     }
 
     /// <summary>Filtered by the Browse search box and sorted by the selected option.</summary>
-    private ListCollectionView CreateBrowseView(List<AddonItemViewModel> items)
+    private void RebuildBrowseItems()
     {
-        var view = new ListCollectionView(items)
-        {
-            Filter = o => Matches((AddonItemViewModel)o, BrowseSearchText)
-        };
+        var search = BrowseSearchText;
+        var items = _browse.Where(i => Matches(i, search)).ToList();
 
-        // SelectedSortOption is still null while the constructor creates the first (empty) view.
+        // SelectedSortOption is still null while the constructor runs.
         if (SelectedSortOption is { } sort)
-            view.CustomSort = sort.Comparer;
-        return view;
+            items.Sort(sort.Comparer);
+        BrowseItems = items;
+    }
+
+    /// <summary>Filtered by the Installed search box, grouped and sorted (see <see cref="InstalledRows"/>).</summary>
+    private void RebuildInstalledRows()
+    {
+        _isInstalledRebuildQueued = false;
+
+        var search = InstalledSearchText;
+        var rows = new List<object>(_installed.Count + 2);
+        var groups = _installed
+            .Where(i => Matches(i, search))
+            .OrderBy(i => i.GroupOrder)
+            .ThenByDescending(i => i.HasUpdate)
+            .ThenBy(i => i.Name, StringComparer.CurrentCultureIgnoreCase)
+            .GroupBy(i => i.Group);
+
+        var counts = new Dictionary<AddonGroup, int>();
+        foreach (var group in groups)
+        {
+            var items = group.ToList();
+            counts[group.Key] = items.Count;
+
+            // Empty groups are hidden; a collapsed group shows only its header.
+            rows.Add(group.Key);
+            if (group.Key.IsExpanded)
+                rows.AddRange(items);
+        }
+
+        AddonGroup.Addons.ItemCount = counts.GetValueOrDefault(AddonGroup.Addons);
+        AddonGroup.Libraries.ItemCount = counts.GetValueOrDefault(AddonGroup.Libraries);
+
+        Synchronize(InstalledRows, rows);
+    }
+
+    /// <summary>Rebuilds the Installed rows once, after a burst of changes (an install changes many properties).</summary>
+    private void QueueInstalledRebuild()
+    {
+        if (_isInstalledRebuildQueued)
+            return;
+
+        _isInstalledRebuildQueued = true;
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (_isInstalledRebuildQueued)
+                RebuildInstalledRows();
+        }, DispatcherPriority.Background);
+    }
+
+    private void OnInstalledItemPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        // Live sorting and grouping: the properties the Installed list is sorted, grouped and filtered by.
+        if (e.PropertyName is nameof(AddonItemViewModel.Group) or nameof(AddonItemViewModel.GroupOrder)
+            or nameof(AddonItemViewModel.HasUpdate) or nameof(AddonItemViewModel.Name)
+            or nameof(AddonItemViewModel.Author) or nameof(AddonItemViewModel.CategoryTitle) or null)
+            QueueInstalledRebuild();
+    }
+
+    private void OnGroupPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(AddonGroup.IsExpanded))
+            QueueInstalledRebuild();
+    }
+
+    /// <summary>
+    /// Makes <paramref name="target"/> equal to <paramref name="source"/> with moves, inserts and removals, so rows
+    /// that stay keep their containers (and the list keeps its scroll position).
+    /// </summary>
+    private static void Synchronize(ObservableCollection<object> target, IReadOnlyList<object> source)
+    {
+        for (var i = 0; i < source.Count; i++)
+        {
+            var item = source[i];
+            if (i < target.Count && ReferenceEquals(target[i], item))
+                continue;
+
+            var existing = -1;
+            for (var j = i + 1; j < target.Count; j++)
+            {
+                if (ReferenceEquals(target[j], item))
+                {
+                    existing = j;
+                    break;
+                }
+            }
+
+            if (existing >= 0)
+                target.Move(existing, i);
+            else
+                target.Insert(i, item);
+        }
+
+        while (target.Count > source.Count)
+            target.RemoveAt(target.Count - 1);
     }
 
     private static bool Matches(AddonItemViewModel item, string search)
@@ -693,8 +780,6 @@ public sealed partial class MainViewModel : ViewModelBase, IAddonActions
         timer.Stop();
         timer.Start();
     }
-
-    private static void RefreshView(ICollectionView view) => view.Refresh();
 
     // ===== Helpers =====
 

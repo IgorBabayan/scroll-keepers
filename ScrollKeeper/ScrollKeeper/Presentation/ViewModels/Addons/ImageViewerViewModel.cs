@@ -1,4 +1,4 @@
-using System.Windows.Media;
+using Avalonia.Media.Imaging;
 using ScrollKeeper.Presentation.Documents;
 using ScrollKeeper.Services.Images;
 
@@ -39,7 +39,7 @@ public sealed partial class ImageViewerViewModel : ViewModelBase
     private int _index;
 
     [ObservableProperty]
-    private ImageSource? _image;
+    private Bitmap? _image;
 
     [ObservableProperty]
     private bool _isLoading;

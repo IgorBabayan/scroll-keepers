@@ -1,0 +1,123 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!--
+        Colors live in Themes/Colors/*.axaml and follow the app's theme variant,
+        so every brush here is referenced with DynamicResource.
+    -->
+
+    <!--
+        Fonts. Each list is tried in order, so every platform gets a native face:
+        Windows (Segoe UI), macOS (Helvetica Neue / Menlo), Linux (Ubuntu, Cantarell, Noto, DejaVu).
+        The body text falls back to the bundled Inter font, everything else to the system default ($Default).
+    -->
+    <FontFamily x:Key="BodyFont">Segoe UI Variable Text, Segoe UI, Helvetica Neue, Ubuntu, Cantarell, Noto Sans, fonts:Inter#Inter, $Default</FontFamily>
+    <FontFamily x:Key="HeadingFont">Georgia, Cambria, Times New Roman, Noto Serif, DejaVu Serif, Liberation Serif, $Default</FontFamily>
+    <FontFamily x:Key="MonospaceFont">Cascadia Mono, Consolas, Menlo, SF Mono, DejaVu Sans Mono, Liberation Mono, Courier New, $Default</FontFamily>
+
+    <!--
+        Icons: outline glyphs on a 24 x 24 grid, drawn by controls:Icon with a round stroke.
+        They replace the Segoe Fluent Icons font, which only exists on Windows.
+    -->
+    <StreamGeometry x:Key="BellGeometry">M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9 M10.3 21a1.94 1.94 0 0 0 3.4 0</StreamGeometry>
+    <StreamGeometry x:Key="SettingsGeometry">M12 9a3 3 0 1 0 0 6a3 3 0 1 0 0-6z M12 5a7 7 0 1 0 0 14a7 7 0 1 0 0-14z M12 2v3 M12 19v3 M2 12h3 M19 12h3 M4.9 4.9l2.1 2.1 M17 17l2.1 2.1 M4.9 19.1l2.1-2.1 M17 7l2.1-2.1</StreamGeometry>
+    <StreamGeometry x:Key="MinimizeGeometry">M4 12h16</StreamGeometry>
+    <StreamGeometry x:Key="MaximizeGeometry">M4 4h16v16H4z</StreamGeometry>
+    <StreamGeometry x:Key="RestoreGeometry">M4 8h12v12H4z M8 4h12v12</StreamGeometry>
+    <StreamGeometry x:Key="CloseGeometry">M5 5l14 14 M19 5L5 19</StreamGeometry>
+    <StreamGeometry x:Key="RefreshGeometry">M21 12a9 9 0 1 1-2.64-6.36 M21 3v6h-6</StreamGeometry>
+    <StreamGeometry x:Key="SearchGeometry">M11 4a7 7 0 1 0 0 14a7 7 0 1 0 0-14z M20 20l-4-4</StreamGeometry>
+    <StreamGeometry x:Key="CheckGeometry">M5 12.5l4.5 4.5L19 7</StreamGeometry>
+    <StreamGeometry x:Key="DeleteGeometry">M4 6h16 M9 6V4h6v2 M6 6l1 14h10l1-14 M10 10v6 M14 10v6</StreamGeometry>
+    <StreamGeometry x:Key="ChevronDownGeometry">M6 9l6 6l6-6</StreamGeometry>
+    <StreamGeometry x:Key="ChevronRightGeometry">M9 6l6 6l-6 6</StreamGeometry>
+    <StreamGeometry x:Key="ChevronLeftGeometry">M15 6l-6 6l6 6</StreamGeometry>
+    <StreamGeometry x:Key="OpenExternalGeometry">M14 4h6v6 M20 4l-9 9 M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5</StreamGeometry>
+    <StreamGeometry x:Key="FolderGeometry">M3 7a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z</StreamGeometry>
+    <StreamGeometry x:Key="MinusGeometry">M5 12h14</StreamGeometry>
+    <StreamGeometry x:Key="PlusGeometry">M12 5v14 M5 12h14</StreamGeometry>
+    <StreamGeometry x:Key="InfoGeometry">M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18z M12 11v5 M12 8h0.01</StreamGeometry>
+    <StreamGeometry x:Key="SuccessGeometry">M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18z M8 12.5l2.5 2.5L16 9.5</StreamGeometry>
+    <StreamGeometry x:Key="WarningGeometry">M12 3L2 20h20z M12 9v5 M12 17h0.01</StreamGeometry>
+    <StreamGeometry x:Key="ErrorGeometry">M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18z M9 9l6 6 M15 9l-6 6</StreamGeometry>
+
+    <!-- Base theme for every button that lives in the title bar -->
+    <ControlTheme x:Key="CaptionButton" TargetType="Button">
+        <Setter Property="Width" Value="46" />
+        <Setter Property="Height" Value="32" />
+        <Setter Property="Foreground" Value="{DynamicResource WindowForegroundBrush}" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Focusable" Value="False" />
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Border Name="Bd" Background="{TemplateBinding Background}">
+                    <ContentPresenter Name="PART_ContentPresenter"
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Center"
+                                      Content="{TemplateBinding Content}"
+                                      ContentTemplate="{TemplateBinding ContentTemplate}" />
+                </Border>
+            </ControlTemplate>
+        </Setter>
+        <Style Selector="^:pointerover /template/ Border#Bd">
+            <Setter Property="Background" Value="{DynamicResource CaptionButtonHoverBrush}" />
+        </Style>
+        <Style Selector="^:pressed /template/ Border#Bd">
+            <Setter Property="Background" Value="{DynamicResource CaptionButtonPressedBrush}" />
+        </Style>
+        <Style Selector="^:disabled">
+            <Setter Property="Opacity" Value="0.4" />
+        </Style>
+    </ControlTheme>
+
+    <!-- Custom (app-specific) title bar buttons, placed before Minimize: narrower, with larger icons -->
+    <ControlTheme x:Key="TitleBarToolButton" TargetType="Button" BasedOn="{StaticResource CaptionButton}">
+        <Setter Property="Width" Value="40" />
+    </ControlTheme>
+
+    <!-- Title bar button that opens a flyout (action center): stays highlighted while the flyout is open -->
+    <ControlTheme x:Key="TitleBarToolToggleButton" TargetType="ToggleButton">
+        <Setter Property="Width" Value="40" />
+        <Setter Property="Height" Value="32" />
+        <Setter Property="Foreground" Value="{DynamicResource WindowForegroundBrush}" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Focusable" Value="False" />
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Border Name="Bd" Background="{TemplateBinding Background}">
+                    <ContentPresenter Name="PART_ContentPresenter"
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Center"
+                                      Content="{TemplateBinding Content}"
+                                      ContentTemplate="{TemplateBinding ContentTemplate}" />
+                </Border>
+            </ControlTemplate>
+        </Setter>
+        <Style Selector="^:pointerover /template/ Border#Bd">
+            <Setter Property="Background" Value="{DynamicResource CaptionButtonHoverBrush}" />
+        </Style>
+        <Style Selector="^:checked /template/ Border#Bd">
+            <Setter Property="Background" Value="{DynamicResource CaptionButtonHoverBrush}" />
+        </Style>
+        <Style Selector="^:pressed /template/ Border#Bd">
+            <Setter Property="Background" Value="{DynamicResource CaptionButtonPressedBrush}" />
+        </Style>
+    </ControlTheme>
+
+    <!-- Close button: red hover like the native one -->
+    <ControlTheme x:Key="CloseCaptionButton" TargetType="Button" BasedOn="{StaticResource CaptionButton}">
+        <Style Selector="^:pointerover">
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+        <Style Selector="^:pointerover /template/ Border#Bd">
+            <Setter Property="Background" Value="{DynamicResource CloseButtonHoverBrush}" />
+        </Style>
+        <Style Selector="^:pressed">
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+        <Style Selector="^:pressed /template/ Border#Bd">
+            <Setter Property="Background" Value="{DynamicResource CloseButtonPressedBrush}" />
+        </Style>
+    </ControlTheme>
+
+</ResourceDictionary>
