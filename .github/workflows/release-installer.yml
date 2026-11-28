@@ -6,6 +6,7 @@ name: Release - installers
 #     reads it and picks the file for its platform),
 #   - the Windows installer as the "ScrollKeeper" package in GitHub Packages (shown in the repo's "Packages" panel).
 # Opening or updating a pull request into `release` does not start a build, so a merge produces exactly one run.
+# The unit tests run first on Windows, Linux and macOS; nothing is built or published unless all of them pass.
 on:
   push:
     branches: [release]
@@ -26,9 +27,39 @@ env:
   CONFIGURATION: Release
 
 jobs:
+  # ===== Unit tests: every platform must pass before any installer is built or published =====
+  test:
+    name: Test (${{ matrix.os }})
+    strategy:
+      fail-fast: true
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Test
+        run: dotnet test ScrollKeeper/ScrollKeeper.sln -c ${{ env.CONFIGURATION }} --logger trx --results-directory TestResults
+
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.os }}
+          path: TestResults/*.trx
+          if-no-files-found: ignore
+
   # ===== Linux: self-contained build packed as ScrollKeeper-<version>-linux-<arch>.tar.gz =====
   build-linux:
     runs-on: ubuntu-latest
+    needs: test
     strategy:
       matrix:
         rid: [linux-x64, linux-arm64]
@@ -76,6 +107,7 @@ jobs:
   # ===== macOS: "Scroll Keeper.app" (ad-hoc signed) zipped as ScrollKeeper-<version>-osx-<arch>.zip =====
   build-macos:
     runs-on: macos-latest
+    needs: test
     strategy:
       matrix:
         rid: [osx-arm64, osx-x64]

@@ -2,6 +2,8 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ScrollKeeper", "ScrollKeeper\ScrollKeeper.csproj", "{12BA6419-3DC5-42A9-9774-D0593C74C24F}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ScrollKeeper.Tests", "ScrollKeeper.Tests\ScrollKeeper.Tests.csproj", "{6D1B3C2E-8F4A-4E57-9B21-3A7C5D9E0F14}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -12,5 +14,9 @@ Global
 		{12BA6419-3DC5-42A9-9774-D0593C74C24F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{12BA6419-3DC5-42A9-9774-D0593C74C24F}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{12BA6419-3DC5-42A9-9774-D0593C74C24F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6D1B3C2E-8F4A-4E57-9B21-3A7C5D9E0F14}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6D1B3C2E-8F4A-4E57-9B21-3A7C5D9E0F14}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6D1B3C2E-8F4A-4E57-9B21-3A7C5D9E0F14}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6D1B3C2E-8F4A-4E57-9B21-3A7C5D9E0F14}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
