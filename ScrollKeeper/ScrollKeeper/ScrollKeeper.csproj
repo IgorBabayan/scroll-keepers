@@ -33,6 +33,11 @@
     </ItemGroup>
 
     <ItemGroup>
+        <!-- Unit tests cover internal parsers and helpers. -->
+        <InternalsVisibleTo Include="ScrollKeeper.Tests" />
+    </ItemGroup>
+
+    <ItemGroup>
         <!-- Window and title bar icon (avares://ScrollKeeper/Assets/App.png). App.ico stays the Windows executable icon. -->
         <AvaloniaResource Include="Assets\**" />
     </ItemGroup>
